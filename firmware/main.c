@@ -11,6 +11,8 @@
  * =================================================================
  * KEM, FEI, TUKE
  * @date 27.02.2024
+ *
+ * Start work at RTOS integration 7.9.2025
  */
 #include <main.h>
 #include <ATB_interface.h>
