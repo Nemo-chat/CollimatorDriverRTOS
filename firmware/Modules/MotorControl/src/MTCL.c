@@ -34,8 +34,6 @@ F32 s_MTCL_MaxTorque__Nm__F32               = DEFAULT_RUN_TORQUE__Nm__dF32;     
 const F32 s_MTCL_MaxPosition__rad__F32      = 5.8448f;  // 10 cm in rad                                             /**< Maximum position for valid request. */
 F32 prev_request_pos__F32__                 = 0.0f;                                                                 /**< Previously requested position. */                                                                                                          /**< Debug variable. */
 
-MTCL_HomingState_enum MTCL_HomingState_e    = MTLC_HOMING_IDLE_e;                                                   /**< Homing related variables. - not used. */
-
 /**
  * @brief Main handling function for motor control
  * @details Manages trajectory calculation and FOC requests.
@@ -43,34 +41,14 @@ MTCL_HomingState_enum MTCL_HomingState_e    = MTLC_HOMING_IDLE_e;               
 void MTCL_MainHandler(void)
 {
     F32 reference_position__rad__F32 = s_MTCL_ReferencePosition__rad__F32;
-    if(MTCL_HomingState_e != MTCL_HOMING_COMPLETE_e)                                                                /* Not used. */
+
+    if (FOC_GetEnableState())
     {
-        s_MTCL_Control_s.motor_homed_f1 = 1;
-        MTCL_HomingState_e = MTCL_HOMING_COMPLETE_e;
+        MTCL_CalculateTrajectory(reference_position__rad__F32, s_MTCL_MaxSpeed__rad_s__F32, s_MTCL_MaxAccel__rad_s2__F32);
+        PWM_SetOutputEnable(True_b);
+        FOC_CalculateOutput(&s_PC_data_s);
+        MTCL_TorqueExceedCheck();
     }
-    s_MTCL_Control_s.movement_enabled_f1 = FOC_GetEnableState();
-
-    if(s_MTCL_Control_s.tracking_to_zero == 1)
-    {
-        reference_position__rad__F32 = 0.0f;
-
-        if( (MDA_GetData_ps()->angular_position__rad__F32) < 0.00001f)
-        {
-            s_Torque_check_s.error_state_torque_exceed_counter_U16++;
-            if(s_Torque_check_s.error_state_torque_exceed_counter_U16 == 2000)
-            {
-                s_MTCL_Control_s.tracking_to_zero = 0;
-                FOC_SetEnableState(False_b);
-                PC_Reset_Data(0);
-                s_MTCL_ReferencePosition__rad__F32 = MDA_GetData_ps()->angular_position__rad__F32;
-                s_Torque_check_s.error_state_torque_exceed_counter_U16 = 0;
-            }
-        }
-    }
-
-    MTCL_CalculateTrajectory(reference_position__rad__F32, s_MTCL_MaxSpeed__rad_s__F32, s_MTCL_MaxAccel__rad_s2__F32);
-    FOC_CalculateOutput(&s_PC_data_s);
-    MTCL_TorqueExceedCheck();
 }
 
 /**
@@ -89,81 +67,6 @@ void MTCL_Init(void)
     GpioCtrlRegs.GPCDIR.bit.GPIO86 = (U16)0;
     GpioCtrlRegs.GPCPUD.bit.GPIO86 = (U16)0;
     EDIS;
-}
-
-/**
- * @brief Motor end switch homing routine
- * @deprecated
- */
-inline void MTCL_Homing(F32 * requested_position_pF32)
-{
-    static F32 s_max_angular_position__rad__F32;
-    static F32 s_time_tick_F32;
-
-    switch(MTCL_HomingState_e)
-    {
-        case MTLC_HOMING_IDLE_e:
-            s_MTCL_MaxSpeed__rad_s__F32 = HOMING_SPEED__rad_s__dF32;            /* Set homing max speed. */
-            s_MTCL_MaxAccel__rad_s2__F32 = HOMING_ACCEL__rad_s__dF32;           /* Set homing max acceleration. */
-            MTCL_HomingState_e = MTCL_HOMING_MAX_e;                             /* Go to the next state. */
-
-        case MTCL_HOMING_MAX_e:
-            *requested_position_pF32 = 1.0e6f;                                  /* Overriding requested position. */
-            if(END_SWITCH_MAX_STATE_db == True_b)                               /* Maximum end switch is activated. */
-            {
-                s_max_angular_position__rad__F32 =
-                        MDA_GetData_ps()->angular_position__rad__F32;           /* Saving temporary maximum position. */
-                FOC_SetEnableState(False_b);                                    /* Immediately stop FOC - stops motor. */
-                s_time_tick_F32 = ATB_GetTicks_U32();                           /* Saving reference time for delay. */
-                PC_Reset_Data(True_b);
-                MTCL_HomingState_e = MTCL_HOMING_MAX_COMPLETE_e;                /* Go to the next state. */
-            }
-            break;
-
-        case MTCL_HOMING_MAX_COMPLETE_e:
-            /* Delay */
-            if(ATB_CheckTicksPassed_U16(s_time_tick_F32, HOMING_DELAT_TICKS_dU32) == (U16)1)
-            {
-                FOC_SetEnableState(True_b);
-                MTCL_HomingState_e = MTCL_HOMING_ZERO_e;
-            }
-            break;
-
-        case MTCL_HOMING_ZERO_e:
-            *requested_position_pF32 = -1.0e6f;                                 /* Overriding requested position. */
-            if(END_SWITCH_ZERO_STATE_db == True_b)
-            {
-                *(F32*)(&s_MTCL_MaxPosition__rad__F32) =
-                        s_max_angular_position__rad__F32
-                        - MDA_GetData_ps()->angular_position__rad__F32;
-                *(F32*)(&MDA_GetData_ps()->angular_position__rad__F32) = 0.0f;  /* Reseting angular position to 0. */
-
-                FOC_SetEnableState(False_b);                                    /* Immediately stop FOC - stops motor. */
-                s_time_tick_F32 = ATB_GetTicks_U32();                           /* Saving reference time for delay. */
-                PC_Reset_Data(True_b);
-                MTCL_HomingState_e = MTCL_HOMING_MAX_COMPLETE_e;                /* Go to the next state. */
-            }
-            break;
-
-        case MTCL_HOMING_ZERO_COMPLETE_e:
-            /* Delay */
-            if(ATB_CheckTicksPassed_U16(s_time_tick_F32, HOMING_DELAT_TICKS_dU32) == (U16)1)
-            {
-                FOC_SetEnableState(True_b);
-                MTCL_HomingState_e = MTCL_HOMING_COMPLETE_e;
-            }
-            break;
-
-        case MTCL_HOMING_COMPLETE_e:
-            s_MTCL_MaxSpeed__rad_s__F32 = DEFAULT_RUN_SPEED__rad_s__dF32;
-            s_MTCL_MaxAccel__rad_s2__F32 = DEFAULT_RUN_ACCEL__rad_s2__dF32;
-            s_MTCL_Control_s.motor_homed_f1 = 1;
-            break;
-
-        default:
-            MTCL_HomingState_e = MTLC_HOMING_IDLE_e;
-            break;
-    }
 }
 
 /**
@@ -328,21 +231,9 @@ boolean MTCL_TorqueExceedCheck(void)
             s_Torque_check_s.torque_exceed_counter_U16 = 0;
             PC_Reset_Data(1);
             s_MTCL_Control_s.over_torque_error_f1 = 1;
-            s_MTCL_Control_s.tracking_to_zero = 1;
-        }
-        else
-        {
-            s_Torque_check_s.torque_exceed_counter_U16 += (U16)1;
-            if(s_Torque_check_s.torque_exceed_counter_U16 > 10000)
-            {
-                s_Torque_check_s.torque_exceed_counter_U16 = 0;
-                PC_Reset_Data(False_b);
-                s_MTCL_Control_s.tracking_to_zero = 0;
-                s_MTCL_Control_s.over_torque_error_f2 = 1;
-                FOC_SetEnableState(False_b);
-                PWM_SetCompareValues(0,0,0);
-                s_MTCL_ReferencePosition__rad__F32 = MDA_GetData_ps()->angular_position__rad__F32;
-            }
+            FOC_SetEnableState(False_b);
+            PWM_SetCompareValues(0,0,0);
+            s_MTCL_ReferencePosition__rad__F32 = MDA_GetData_ps()->angular_position__rad__F32;
         }
     }
     return True_b;

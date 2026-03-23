@@ -75,8 +75,6 @@ void main(void)
     /* Main loop */
     while(1)
     {
-
-        PWM_SetOutputEnable(True_b);
         ECOM_MainHandler();
         AC_ManualControlHandler();
         DisplayRefresh();

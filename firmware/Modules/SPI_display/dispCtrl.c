@@ -18,8 +18,7 @@
 #include "FOC.h"
 
  char buffer[12] = {};                 /**< Buffer for message which send*/
- U16 states = 0;                       /**< States display value*/
- U16 f2_error_display_state_U16 = 0;   /**< State indicator for second over torque state*/
+ boolean StartApplicantionState = False_b;   /**< State display value*/
 
  /**
   * @brief Reverse data byte according with display manual.
@@ -215,76 +214,49 @@ void float_to_char_array(F32 f, char* buffer, U16 precision) {
  */
 void DisplayRefresh(void)
 {
-    static U32 ref_ticks_U32 = 0;
-    static boolean over_torque_written_b = False_b;
-
-    if(s_MTCL_Control_s.over_torque_error_f1 == 1 && states == 0)
+    if(s_MTCL_Control_s.over_torque_error_f1 == 1)
     {
         dispCtrl_vSetPosition(1,2);
         dispCtrl_u16PutString("     ERROR:     ");
         dispCtrl_vSetPosition(1,3);
         dispCtrl_u16PutString(" Route obstacle ");
         dispCtrl_vSetPosition(1,4);
-        dispCtrl_u16PutString("  Motor homing  ");
-        states = 1;
+        dispCtrl_u16PutString("  Motor disabled  ");
+        StartApplicantionState = False_b;
     }
-                if( ATB_CheckTicksPassed_U16(ref_ticks_U32, ATB_MS_TO_TICKS_dM_U32(100)) && s_MTCL_Control_s.tracking_to_zero == 0 )
-                {
-                    ref_ticks_U32 = ATB_GetTicks_U32();
-                    if(s_MTCL_Control_s.over_torque_error_f2 && states == 1)
-                    {
-                        if(over_torque_written_b == False_b)
-                        {
-                            dispCtrl_vSetPosition(1,1);
-                            dispCtrl_u16PutString("HOMING PROCEDURE");
-                            dispCtrl_vSetPosition(1,2);
-                            dispCtrl_u16PutString("  INTERRUPTED,  ");
-                            dispCtrl_vSetPosition(1,3);
-                            dispCtrl_u16PutString(" SERVICE CHECK  ");
-                            dispCtrl_vSetPosition(1,4);
-                            dispCtrl_u16PutString("     NEEDED     ");
-                            f2_error_display_state_U16 = 1;
-                        }
-                        over_torque_written_b = True_b;
-                    }
-                    else
-                    {
-                        over_torque_written_b = False_b;
-                    }
 
-                    if(FOC_GetEnableState())
-                    {
-                        dispCtrl_vSetPosition(1,3);
-                        float_to_char_array( ceiling_F32(( (MDA_GetData_ps()->angular_position__rad__F32 / 0.058448f) )), &buffer, 1);
-                        dispCtrl_u16PutString(&buffer);
-                        dispCtrl_u16PutString(" mm   ");
-                        dispCtrl_vSetPosition(14,3);
-                        dispCtrl_u16PutString(" ON");
-                        s_MTCL_Control_s.over_torque_error_f2 = 0;
-                        f2_error_display_state_U16 = 0;
-                    }
-                    else if ( !FOC_GetEnableState() && f2_error_display_state_U16 == 0)
-                    {
-                        dispCtrl_vSetPosition(1,3);
-                        float_to_char_array( ceiling_F32(( (MDA_GetData_ps()->angular_position__rad__F32 / 0.058448f) )), &buffer, 1);
-                        dispCtrl_u16PutString(&buffer);
-                        dispCtrl_u16PutString(" mm   ");
-                        dispCtrl_vSetPosition(14,3);
-                        dispCtrl_u16PutString("OFF");
-                    }
+    if(FOC_GetEnableState())
+    {
+        dispCtrl_vSetPosition(1,3);
+        float_to_char_array( ceiling_F32(( (MDA_GetData_ps()->angular_position__rad__F32 / 0.058448f) )), &buffer, 1);
+        dispCtrl_u16PutString(&buffer);
+        dispCtrl_u16PutString(" mm   ");
+        dispCtrl_vSetPosition(14,3);
+        dispCtrl_u16PutString(" ON");
+    }
 
-                    if(states && f2_error_display_state_U16 == 0){
-                            dispCtrl_vSetPosition(1,1);
-                            dispCtrl_u16PutString("Collimator Blade");
-                            dispCtrl_vSetPosition(1,2);
-                            dispCtrl_u16PutString("Position:      ");
-                            dispCtrl_vSetPosition(1,3);
-                            dispCtrl_u16PutString("                ");
-                            dispCtrl_vSetPosition(1,4);
-                            dispCtrl_u16PutString("<-1 mm    +1 mm>");
-                            states = 0;
-                    }
-                }
+    else
+    {
+        dispCtrl_vSetPosition(1,3);
+        float_to_char_array( ceiling_F32(( (MDA_GetData_ps()->angular_position__rad__F32 / 0.058448f) )), &buffer, 1);
+        dispCtrl_u16PutString(&buffer);
+        dispCtrl_u16PutString(" mm   ");
+        dispCtrl_vSetPosition(14,3);
+        dispCtrl_u16PutString("OFF");
+    }
+
+    if(!StartApplicantionState && s_MTCL_Control_s.over_torque_error_f1 == 0){
+            dispCtrl_vSetPosition(1,1);
+            dispCtrl_u16PutString("Collimator Blade");
+            dispCtrl_vSetPosition(1,2);
+            dispCtrl_u16PutString("Position:      ");
+            dispCtrl_vSetPosition(1,3);
+            dispCtrl_u16PutString("                ");
+            dispCtrl_vSetPosition(1,4);
+            dispCtrl_u16PutString("<-1 mm    +1 mm>");
+            StartApplicantionState = True_b;
+    }
+                
 }
 
 /**
