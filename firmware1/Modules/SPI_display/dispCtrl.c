@@ -119,6 +119,13 @@ void dispCtrl_vInitDisplay(void){
 
     DELAY_US(55000);
 
+    dispCtrl_clear();
+    dispCtrl_vSetPosition(1,1);
+    dispCtrl_u16PutString("Collimator Blade");
+    dispCtrl_vSetPosition(1,2);
+    dispCtrl_u16PutString("Position: ");
+    dispCtrl_vSetPosition(1,4);
+    dispCtrl_u16PutString("<-1 mm    +1 mm>");
 }
 
 /**

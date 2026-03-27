@@ -31,8 +31,6 @@
 extern TRAN_struct tran_s;
 extern boolean alarm_state;
 
-Uint16 u16buffer_counter;
-Uint16 FOC_counter;
 
 void main(void)
 {
@@ -51,19 +49,7 @@ void main(void)
     MDA_CalibratePhaseCurrentsOffsets();
     AC_ManualControlInit();
 
-
-
-    //dispCtrl_clear();
-    dispCtrl_vSetPosition(1,1);
-    dispCtrl_u16PutString("Collimator Blade");
-    dispCtrl_vSetPosition(1,2);
-    dispCtrl_u16PutString("Position: ");
-    dispCtrl_vSetPosition(1,4);
-    dispCtrl_u16PutString("<-1 mm    +1 mm>");
-
-
     /*Redundant reset of PI controller structures*/
-
     PI_ctrl_Init(&PI_id_current_controller);
     PI_ctrl_Init(&PI_iq_current_controller);
     PI_ctrl_Init(&PI_speed_controller);
