@@ -15,6 +15,31 @@
 
 #include "spi.h"
 
+void spi_PinsInit(void)
+{
+    EALLOW;
+
+    GpioCtrlRegs.GPBGMUX2.bit.GPIO58 = 1;
+    GpioCtrlRegs.GPBMUX2.bit.GPIO58 = 2;
+    GpioCtrlRegs.GPBCSEL4.bit.GPIO58 = 3; // select master core CPU2
+
+    GpioCtrlRegs.GPBGMUX2.bit.GPIO59 = 1;
+    GpioCtrlRegs.GPBMUX2.bit.GPIO59 = 2;
+    GpioCtrlRegs.GPBCSEL4.bit.GPIO59 = 3; // select master core CPU2
+    //GpioCtrlRegs.GPBDIR.bit.GPIO59 = 1;
+
+    GpioCtrlRegs.GPBGMUX2.bit.GPIO60 = 1;
+    GpioCtrlRegs.GPBMUX2.bit.GPIO60 = 2;
+    GpioCtrlRegs.GPBCSEL4.bit.GPIO60 = 3; // select master core CPU2
+
+    GpioCtrlRegs.GPBGMUX2.bit.GPIO61 = 1;
+    GpioCtrlRegs.GPBMUX2.bit.GPIO61 = 2;
+    GpioCtrlRegs.GPBCSEL4.bit.GPIO61 = 3; // select master core CPU2
+   // GpioCtrlRegs.GPBQSEL2.bit.GPIO61 = 3;
+
+    EDIS;
+}
+
 /**
  * @brief Initialization SPI module with FIFO.
  * @details 600 kHz < Baudrate < 920 kHz
@@ -26,24 +51,8 @@ void spi_vInit(float u16BaudRate){
     EALLOW;
     ClkCfgRegs.LOSPCP.bit.LSPCLKDIV = 1; /* set LSPCLK divider on =/2 - 50*/
     CpuSysRegs.PCLKCR8.bit.SPI_B = 1;
-
-    GpioCtrlRegs.GPBGMUX2.bit.GPIO58 = 1;
-    GpioCtrlRegs.GPBMUX2.bit.GPIO58 = 2;
-
-    GpioCtrlRegs.GPBGMUX2.bit.GPIO59 = 1;
-    GpioCtrlRegs.GPBMUX2.bit.GPIO59 = 2;
-    //GpioCtrlRegs.GPBDIR.bit.GPIO59 = 1;
-
-
-    GpioCtrlRegs.GPBGMUX2.bit.GPIO60 = 1;
-    GpioCtrlRegs.GPBMUX2.bit.GPIO60 = 2;
-
-    GpioCtrlRegs.GPBGMUX2.bit.GPIO61 = 1;
-    GpioCtrlRegs.GPBMUX2.bit.GPIO61 = 2;
-   // GpioCtrlRegs.GPBQSEL2.bit.GPIO61 = 3;
-
-
     EDIS;
+
     SpibRegs.SPICCR.bit.SPISWRESET = 0;
 
     #if CLOCK_POLARITY == 1

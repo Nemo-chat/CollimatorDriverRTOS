@@ -11,12 +11,12 @@
 
 boolean alarm_state = 0;
 
-inline void ISR_MotorControlHandler(void)
-{
-    ATB_IncrementTime();
-    /* Motor control functionality. Called every PWM cycle. */
-    //if(FOC_GetEnableState()) kukam_prud();
-    MTCL_MainHandler();
-}
+// inline void ISR_MotorControlHandler(void)
+// {
+//     ATB_IncrementTime();
+//     /* Motor control functionality. Called every PWM cycle. */
+//     //if(FOC_GetEnableState()) kukam_prud();
+//     MTCL_MainHandler();
+// }
 
 

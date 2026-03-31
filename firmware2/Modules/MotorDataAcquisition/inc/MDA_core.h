@@ -40,10 +40,10 @@
 #define MDA_ENC_TIME_BETWEEN_PULSES__s__dMF32(count)    ( (F32)count / (F32)100.0E6 )
 
 /* Initialization functions. */
-static void MDA_AdcInit(void);
+static void MDA_AdcInit(interrupt void (*adc_isr)(void));
 static void MDA_QepInit(void);
 
-static void MDA_UpdateData(void);
+void MDA_UpdateData(void);
 
 /* Helper functions. */
 static U16 MDA_GetRawRotorMechAngle_U16(void);

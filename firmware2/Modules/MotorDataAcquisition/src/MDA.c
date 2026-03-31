@@ -34,24 +34,9 @@ const static F32 s_MDA_phase_w_offset_current__A__dF32  = (F32)0.0;
  *********************************************************************************************************************************************/
 
 /**
- * @brief ADC conversion completion interrupt.
- */
-interrupt void MDA_AdcConverstionCompleteIsr(void)
-{
-
-
-    EINT;
-    MDA_UpdateData();
-    ISR_MotorControlHandler();
-    AdcaRegs.ADCINTFLGCLR.bit.ADCINT1   = (U16)1;                                   /* Clear interrupt flag. */
-    PieCtrlRegs.PIEACK.bit.ACK1         = (U16)1;
-
-}
-
-/**
  * @brief ADC initialization function.
  */
-static inline void MDA_AdcInit(void)
+static inline void MDA_AdcInit(interrupt void (*adc_isr)(void))
 {
     EALLOW;
     /* Enable ADC clocks. */
@@ -99,7 +84,7 @@ static inline void MDA_AdcInit(void)
     PieCtrlRegs.PIECTRL.bit.ENPIE       = (U16)1;                                   /* Enable interrupt vector table peripheral. */
     PieCtrlRegs.PIEIER1.bit.INTx1       = (U16)1;
     IER                                 |= M_INT1;                                  /* Enable CPU interrupt line. */
-    PieVectTable.ADCA1_INT              = &MDA_AdcConverstionCompleteIsr;
+    PieVectTable.ADCA1_INT              = adc_isr;
     EINT;                                                                           /* GLobally enable interrupts. */
 
     EDIS;
@@ -187,7 +172,7 @@ void MDA_CalibratePhaseCurrentsOffsets(void)
 /**
  * @brief Update data structure with newly acquired measurement data.
  */
-static inline void MDA_UpdateData(void)
+inline void MDA_UpdateData(void)
 {
     TRAN_struct current_transf_s = {0};
     /*Counter for speed calculation each 250e-6 = 5 interrupts*/
@@ -325,9 +310,9 @@ void MDA_GetRawPhaseCurrents(F32 * const u_pF32, F32 * const v_pF32, F32 * const
 /**
  * @brief Motor data acquisition initialization function.
  */
-void MDA_Init(void)
+void MDA_Init(interrupt void (*adc_isr)(void))
 {
-    MDA_AdcInit();
+    MDA_AdcInit(adc_isr);
     MDA_QepInit();
 }
 

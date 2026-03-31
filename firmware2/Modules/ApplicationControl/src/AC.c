@@ -20,6 +20,8 @@
 #include <ATB_interface.h>
 #include <FOC.h>
 
+AC_BTNManualControl_struct s_AC_BTNManualControl_s = {False_b, 0.0f};    /**< Button manual control struct. */
+
 /**
  * @brief Control button initialization.
  */
@@ -78,15 +80,34 @@ U16 AC_BtnDebounce_U16(AC_BtnDebounce_struct* debounce_ps, boolean current_state
 
 void AC_ManualControlHandler(void)
 {
-    if(AC_BtnDebounce_U16(&AC_Btn1Debounce_s, AC_BTN1_PRESSED_db) == DEBOUNCE_RISING_EDGE_e)
-    {
-        MTCL_SetReferencePosition(MDA_GetData_ps()->angular_position__rad__F32 + 0.058448f);
-    }
+    boolean AC_BTN1_PRESSED_b = (AC_BtnDebounce_U16(&AC_Btn1Debounce_s, AC_BTN1_PRESSED_db) == DEBOUNCE_RISING_EDGE_e);
+    boolean AC_BTN2_PRESSED_b = (AC_BtnDebounce_U16(&AC_Btn2Debounce_s, AC_BTN2_PRESSED_db) == DEBOUNCE_RISING_EDGE_e);
 
-    if(AC_BtnDebounce_U16(&AC_Btn2Debounce_s, AC_BTN2_PRESSED_db) == DEBOUNCE_RISING_EDGE_e)
+    /* No action if both pressed or both not pressed */
+    if (AC_BTN1_PRESSED_b == AC_BTN2_PRESSED_b)
     {
-        MTCL_SetReferencePosition(MDA_GetData_ps()->angular_position__rad__F32 - 0.058448f);
+        s_AC_BTNManualControl_s.any_button_pressed_b = False_b;
     }
+    else
+    {
+        s_AC_BTNManualControl_s.any_button_pressed_b = True_b;
+
+        if (AC_BTN1_PRESSED_b)
+        {
+            // MTCL_SetReferencePosition(MDA_GetData_ps()->angular_position__rad__F32 + 0.058448f);
+            s_AC_BTNManualControl_s.BTN_ReferencePosition__rad__F32 = MDA_GetData_ps()->angular_position__rad__F32 + 0.058448f;
+        }
+        if (AC_BTN2_PRESSED_b)
+        {
+            // MTCL_SetReferencePosition(MDA_GetData_ps()->angular_position__rad__F32 - 0.058448f);
+            s_AC_BTNManualControl_s.BTN_ReferencePosition__rad__F32 = MDA_GetData_ps()->angular_position__rad__F32 - 0.058448f;
+        }
+    }
+}
+
+inline const AC_BTNManualControl_struct* AC_GetBTNData_ps(void)
+{
+    return &s_AC_BTNManualControl_s;
 }
 
 void AC_ExecuteCommand( const U16 * const command_payload_pU16,

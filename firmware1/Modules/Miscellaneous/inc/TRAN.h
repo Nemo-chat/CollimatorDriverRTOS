@@ -13,7 +13,7 @@
  */
 
 #ifndef MODULES_MISCELANEOUS_INC_TRAN_H_
-#define MODULES_MISCELANEOUS_INCTRAN_H_
+#define MODULES_MISCELANEOUS_INC_TRAN_H_
 #include <app_types.h>
 
 #define TRAN_DEG_TO_RAD_dMF32(deg)  ( (F32)deg * (F32)0.017453292519943295 )        /* deg * (pi / 180.0) */

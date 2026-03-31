@@ -39,7 +39,7 @@ MEMORY
                                                                /* Only on F28379D, F28377D, F28375D devices. Remove line on other devices. */
 
    RAMLSxDxGSx      : origin = 0x008000, length = 0x008000 // Start at RAMLS0, end at RAMGS3
-   RAMGSx           : origin = 0x010000, length = 0x00019FFF // Start at RAMGS4, end at RAMGS13
+   RAMGSx           : origin = 0x010000, length = 0x006FFF // Start at RAMGS4, end at RAMGS10
 
 
 

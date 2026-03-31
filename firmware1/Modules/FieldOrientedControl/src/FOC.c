@@ -17,6 +17,7 @@
 
 boolean s_FOC_EnableState_b = False_b;
 static TRAN_struct s_trans_s = {0};
+const MDA_Data_struct* s_MDA_data_ps_for_MTCL = NULL;
 
 /* Debug variables. */
 F32 Qcurrent=0;
@@ -30,32 +31,32 @@ F32 requestposition = 0;
  * @details Function processes pre-correction regulator inputs, calculates action values as regulation outputs functions, compensates non-linearities of PMSM, transforms
  * desired voltages in rotational 2-phase system to 3-phase stator system, generates desired PWM output, limits desired voltage action values
  */
-void FOC_CalculateOutput(const PC_Data_struct* trajectory_data_ps)
+void FOC_CalculateOutput(const PC_Data_struct* trajectory_data_ps, const MDA_Data_struct* motor_data_ps)
 {
     /* Exit when FOC is disabled. */
     if(s_FOC_EnableState_b == False_b)
     {
         return;
     }
-    const MDA_Data_struct* motor_data_ps = MDA_GetData_ps();
+    s_MDA_data_ps_for_MTCL = motor_data_ps;
 
     /*compensation of nonlinearity in the id current component = Lq*p*iq*wr* */
-    F32 CompensationCurrent_id = (F32) ( (F32)MOTOR_POLE_PAIRS_dU16 * ( MOTOR_INDUCTANCE__H__df32 / 2.0f ) * motor_data_ps->currents_s.iq__A__F32 * motor_data_ps->rotor_mech_speed__rad_s1__F32 );
+    F32 CompensationCurrent_id = (F32) ( (F32)MOTOR_POLE_PAIRS_dU16 * ( MOTOR_INDUCTANCE__H__df32 / 2.0f ) * s_MDA_data_ps_for_MTCL->currents_s.iq__A__F32 * s_MDA_data_ps_for_MTCL->rotor_mech_speed__rad_s1__F32 );
     /*compensation of nonlinearity in the iq current component = Ld*p*id*wr */
-    F32 CompensationCurrent_iq = (F32) ( (F32)MOTOR_POLE_PAIRS_dU16 * ( MOTOR_INDUCTANCE__H__df32 / 2.0f ) * motor_data_ps->currents_s.id__A__F32 * motor_data_ps->rotor_mech_speed__rad_s1__F32 );
+    F32 CompensationCurrent_iq = (F32) ( (F32)MOTOR_POLE_PAIRS_dU16 * ( MOTOR_INDUCTANCE__H__df32 / 2.0f ) * s_MDA_data_ps_for_MTCL->currents_s.id__A__F32 * s_MDA_data_ps_for_MTCL->rotor_mech_speed__rad_s1__F32 );
     /*compensation of induced voltage = p*lambda*wr */
-    F32 CompensationIndVoltage = (F32) ( (F32)MOTOR_POLE_PAIRS_dU16 * MOTOR_MAGNETIC_FLUX_OF_ROTOR_MAGNTES__Wb__df32 * motor_data_ps->rotor_mech_speed__rad_s1__F32);
+    F32 CompensationIndVoltage = (F32) ( (F32)MOTOR_POLE_PAIRS_dU16 * MOTOR_MAGNETIC_FLUX_OF_ROTOR_MAGNTES__Wb__df32 * s_MDA_data_ps_for_MTCL->rotor_mech_speed__rad_s1__F32);
 
     /*Controllers*/
     PI_position_controller.ref_value_f32 = trajectory_data_ps->Start_Absolute_Position__rad__F32 + trajectory_data_ps->tj.Position__rad__F32;;
     PI_position_controller.action_value_f32 = 0.0f;
     /* PI_speed_action = PI_position_output */
-    requestspeed = PI_ctrl_CalculateOutput(&PI_position_controller, motor_data_ps->angular_position__rad__F32);
-    PI_speed_controller.action_value_f32 = PI_ctrl_CalculateOutput(&PI_position_controller, motor_data_ps->angular_position__rad__F32);
+    requestspeed = PI_ctrl_CalculateOutput(&PI_position_controller, s_MDA_data_ps_for_MTCL->angular_position__rad__F32);
+    PI_speed_controller.action_value_f32 = PI_ctrl_CalculateOutput(&PI_position_controller, s_MDA_data_ps_for_MTCL->angular_position__rad__F32);
     PI_speed_controller.ref_value_f32 = trajectory_data_ps->tj.Speed__rad_s__F32;
 
     /* PI_iq_action = PI_speed_output */
-    Qcurrent= PI_ctrl_CalculateOutput(&PI_speed_controller, motor_data_ps->rotor_mech_speed__rad_s1__F32);
+    Qcurrent= PI_ctrl_CalculateOutput(&PI_speed_controller, s_MDA_data_ps_for_MTCL->rotor_mech_speed__rad_s1__F32);
     PI_iq_current_controller.action_value_f32 = Qcurrent;
     /* PI_iq_ref = acceleration * Jm *kt */
     PI_iq_current_controller.ref_value_f32 = trajectory_data_ps->tj.Acceleration__rad_s_2__F32 * MOTOTR_MOMENT_OF_INERTIA__kg_m2__df32 * MOTOR_TORQUE_CONSTANT__Nm_A__df32;
@@ -63,11 +64,11 @@ void FOC_CalculateOutput(const PC_Data_struct* trajectory_data_ps)
     PI_id_current_controller.ref_value_f32 = Dcurrent;
 
     /* ud = output from PI Controller id - compensation of nonlinearity in the current component id */
-    s_trans_s.dq_s.d_F32 = (F32)( ( PI_ctrl_CalculateOutput(&PI_id_current_controller, motor_data_ps->currents_s.id__A__F32) - CompensationCurrent_id ) );
+    s_trans_s.dq_s.d_F32 = (F32)( ( PI_ctrl_CalculateOutput(&PI_id_current_controller, s_MDA_data_ps_for_MTCL->currents_s.id__A__F32) - CompensationCurrent_id ) );
     /* uq = output from PI Controller iq - compensation of nonlinearity in the current component iq + compensation of induced voltage*/
-    s_trans_s.dq_s.q_F32 = (F32)( ( PI_ctrl_CalculateOutput(&PI_iq_current_controller, motor_data_ps->currents_s.iq__A__F32) + CompensationCurrent_iq + CompensationIndVoltage ) );
+    s_trans_s.dq_s.q_F32 = (F32)( ( PI_ctrl_CalculateOutput(&PI_iq_current_controller, s_MDA_data_ps_for_MTCL->currents_s.iq__A__F32) + CompensationCurrent_iq + CompensationIndVoltage ) );
     /* electric angle */
-    s_trans_s.angle__rad__F32 = motor_data_ps->rotor_el_angle__rad__F32;
+    s_trans_s.angle__rad__F32 = s_MDA_data_ps_for_MTCL->rotor_el_angle__rad__F32;
 
     /* voltage limiter */
     FOC_VoltageLimiter(&s_trans_s);
@@ -76,9 +77,9 @@ void FOC_CalculateOutput(const PC_Data_struct* trajectory_data_ps)
     TRAN_DqToAbc(&s_trans_s);
 
     /* Write new compare values to PWM. */
-    PWM_SetCompareValues(PWM_DUTY_TO_CMP_dMU16( (s_trans_s.abc_s.a_F32 / motor_data_ps->dc_link_voltage__V__F32) + 0.5f ),
-                         PWM_DUTY_TO_CMP_dMU16( (s_trans_s.abc_s.b_F32 / motor_data_ps->dc_link_voltage__V__F32) + 0.5f ),
-                         PWM_DUTY_TO_CMP_dMU16( (s_trans_s.abc_s.c_F32 / motor_data_ps->dc_link_voltage__V__F32) + 0.5f ));
+    PWM_SetCompareValues(PWM_DUTY_TO_CMP_dMU16( (s_trans_s.abc_s.a_F32 / s_MDA_data_ps_for_MTCL->dc_link_voltage__V__F32) + 0.5f ),
+                         PWM_DUTY_TO_CMP_dMU16( (s_trans_s.abc_s.b_F32 / s_MDA_data_ps_for_MTCL->dc_link_voltage__V__F32) + 0.5f ),
+                         PWM_DUTY_TO_CMP_dMU16( (s_trans_s.abc_s.c_F32 / s_MDA_data_ps_for_MTCL->dc_link_voltage__V__F32) + 0.5f ));
 }
 
 /**
@@ -93,7 +94,7 @@ void FOC_VoltageLimiter(TRAN_struct * const tran_values_s)
     const F32 ud_squared_F32 = tran_values_s->dq_s.d_F32 * tran_values_s->dq_s.d_F32;
     const F32 uq_squared_F32 =  tran_values_s->dq_s.q_F32 * tran_values_s->dq_s.q_F32;
     const F32 voltage_vector_amplitude_F32 = FM_sqrt_F32( ud_squared_F32 + uq_squared_F32 );
-    const F32 max_voltage_vector_F32 = 0.5f * MDA_GetData_ps()->dc_link_voltage__V__F32;
+    const F32 max_voltage_vector_F32 = 0.5f * s_MDA_data_ps_for_MTCL->dc_link_voltage__V__F32;
     F32 uq_limited_F32;
 
     if( voltage_vector_amplitude_F32 > max_voltage_vector_F32 )
@@ -116,7 +117,7 @@ void FOC_SetEnableState(boolean new_state_b)
         PI_ctrl_Init(&PI_iq_current_controller);
         PI_ctrl_Init(&PI_speed_controller);
         PI_ctrl_Init(&PI_position_controller);
-        s_MTCL_ReferencePosition__rad__F32 = MDA_GetData_ps()->angular_position__rad__F32;
+        s_MTCL_ReferencePosition__rad__F32 = s_MDA_data_ps_for_MTCL->angular_position__rad__F32;
     }
     s_FOC_EnableState_b = new_state_b;
 }
@@ -137,7 +138,7 @@ boolean FOC_GetEnableState(void)
  */
 F32 FOC_GetTorque__Nm__F32(void)
 {
-    return MDA_GetData_ps()->currents_s.iq__A__F32 * MOTOR_TORQUE_CONSTANT__Nm_A__df32;
+    return s_MDA_data_ps_for_MTCL->currents_s.iq__A__F32 * MOTOR_TORQUE_CONSTANT__Nm_A__df32;
 }
 
 /**

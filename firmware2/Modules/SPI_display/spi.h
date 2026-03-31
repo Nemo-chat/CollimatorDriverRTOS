@@ -22,6 +22,7 @@
 #define CLOCK_POLARITY 1          /**< MACRO Clock polarity*/
 #define CLOCK_PHASE 0             /**< MACRO Clock phase*/
 
+void spi_PinsInit(void);
 
 void spi_vInit(float u16BaudRate);
 
