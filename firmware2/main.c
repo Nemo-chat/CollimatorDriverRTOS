@@ -236,7 +236,7 @@ static void CommunicationTask_Func(void *pvParameters)
         if (should_update_shared_data_b)
         {
             IpcRegs.IPCSET.bit.IPC2 = 1; 
-            while(IpcRegs.IPCFLG.bit.IPC2 != 0); // Wait for CPU1 to acknowledge the update
+            while(IpcRegs.IPCSTS.bit.IPC2 != 0); // Wait for CPU1 to acknowledge the update
         }
 
         // Increment the execution counter
