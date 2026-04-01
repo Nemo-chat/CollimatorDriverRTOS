@@ -33,9 +33,6 @@
 #include "semphr.h"
 #include "FreeRTOSConfig.h"
 
-extern TRAN_struct tran_s;
-extern boolean alarm_state;
-
 // Macro to define stack size of individual tasks
 #define PROCESS_INPUT_TASK_STACK_SIZE 1024
 #define APPLICATION_TASK_STACK_SIZE 256
@@ -55,6 +52,16 @@ typedef struct
 
 }SharedDataCPU1TOCPU2_struct;
 
+typedef struct 
+{
+    MTCL_MovementParams_struct mtcl_movement_params_s;
+    F32 reference_position_rad_F32;
+    boolean foc_enable_state_b;
+    boolean reset_error_flags_b;
+    AC_CommandIndex_enum received_command_e;
+
+}SharedDataCPU2TOCPU1_struct;
+
 // Task handles
 TaskHandle_t ProcessInputTask, ApplicationTask;
 
@@ -63,19 +70,28 @@ static volatile uint32_t ctrProcessInputTaskHit = 0;
 static volatile uint32_t ctrProcessInputTask = 0;
 static volatile uint32_t ctrApplicationTask = 0;
 static volatile uint32_t ctrInterrputEvent = 0;
+static volatile uint32_t ctrInterrputEventIPC0 = 0;
+static volatile uint32_t ctrInterrputEventIPC1 = 0;
 
 uint32_t elapsedTime = 0;
 uint32_t startTime = 0;
 uint32_t endTime = 0;
 
+boolean ECOM_DataAvailable_b = False_b;
+
 // The Semaphore for synchronization ISR by ADC and Process Inputs Task.
 SemaphoreHandle_t SyncSemaphore;
 // Mutex for shared data access
 SemaphoreHandle_t Mutex; 
+SemaphoreHandle_t IPCSharedMemoryMutex_cpu1;
 
 // Shared data structure for communication between CPU1 and CPU2
 volatile SharedDataCPU1TOCPU2_struct SharedDataCPU1TOCPU2;
 #pragma DATA_SECTION(SharedDataCPU1TOCPU2, "MSGRAM_CPU1_TO_CPU2")
+
+// Shared data structure for communication between CPU1 and CPU2
+volatile SharedDataCPU2TOCPU1_struct SharedDataCPU2TOCPU1;
+#pragma DATA_SECTION(SharedDataCPU2TOCPU1, "MSGRAM_CPU2_TO_CPU1")
 
 static StaticTask_t idleTaskBuffer;
 static StackType_t  idleTaskStack[STACK_SIZE];
@@ -128,14 +144,22 @@ interrupt void MDA_AdcConverstionCompleteIsr(void)
 
 }
 
+__interrupt void isr_IPC0_cpu1(void);
+__interrupt void isr_IPC1_cpu1(void);
+__interrupt void isr_IPC2_cpu1(void);
+
 void main(void)
 {
     // Create a semaphore.
     SyncSemaphore = xSemaphoreCreateBinary();
     Mutex = xSemaphoreCreateMutex();
+    IPCSharedMemoryMutex_cpu1 = xSemaphoreCreateMutex();
 
     /* Initialization */
     mcu_vInitClocks();                              /* Initialize uC clock system. */
+    Interrupt_initModule();       // Need reveiw if it neccessary
+    Interrupt_initVectorTable();  // Need reveiw if it neccessary
+    IPC_ISRvInit_CPU1(&isr_IPC0_cpu1, &isr_IPC1_cpu1, &isr_IPC2_cpu1);          // Initialize IPC ISRs for CPU1
     spi_PinsInit();                                 /* Initialize SPI pins, select master core CPU2 */
     dispCtrl_vInitDisplay();
     ATB_Init();
@@ -186,8 +210,9 @@ void main(void)
         ESTOP0;
     }
 
-    // IPC synchronization with CPU2 must be here
-    // ....
+    // IPC synchronization with CPU2
+    while(IpcRegs.IPCSTS.bit.IPC17 == 0);
+    IpcRegs.IPCACK.bit.IPC17 = 1;
 
     // Start the scheduler.  This should not return.
     vTaskStartScheduler();
@@ -217,8 +242,14 @@ static void ProcessInputsTask_Func(void *pvParameters)
         AC_ManualControlHandler(); 
 
         xSemaphoreTake(Mutex, portMAX_DELAY);                               // Take the mutex before accessing shared data
+        xSemaphoreTake(IPCSharedMemoryMutex_cpu1, portMAX_DELAY);                               // Take the IPC mutex to synchronize with CPU2
+        take_ipc_mutex_cpu1();                                              // Take the IPC mutex to synchronize with CPU2
+       
         SharedDataCPU1TOCPU2.mda_data_s = *MDA_GetData_ps();                // Read updated data from shared memory
         SharedDataCPU1TOCPU2.ac_btn_manual_control_s = *AC_GetBTNData_ps(); // Read updated button control data from shared memory
+        
+        xSemaphoreGive(IPCSharedMemoryMutex_cpu1);                                              // Give the IPC mutex to allow CPU2 to access shared data
+        give_ipc_mutex_cpu1();                                              // Give the IPC mutex to allow CPU2 to access shared data
         xSemaphoreGive(Mutex);                                              // Give the mutex after accessing shared data
 
         xTaskNotifyGive(ApplicationTask); // Notify the Application Task that new data is available
@@ -250,8 +281,14 @@ static void ApplicationTask_Func(void *pvParameters)
             ATB_IncrementTime();
             
             xSemaphoreTake(Mutex, portMAX_DELAY);                                 // Take the mutex before accessing shared data
+            xSemaphoreTake(IPCSharedMemoryMutex_cpu1, portMAX_DELAY);                               // Take the IPC mutex to synchronize with CPU2
+            take_ipc_mutex_cpu1();                                                // Take the IPC mutex to synchronize with CPU2
+
             localCopyOfSharedData.mda_data_s = SharedDataCPU1TOCPU2.mda_data_s;   // Read shared data of MDA into local copy
             localCopyOfSharedData.ac_btn_manual_control_s = SharedDataCPU1TOCPU2.ac_btn_manual_control_s; 
+            
+            xSemaphoreGive(IPCSharedMemoryMutex_cpu1);                                              // Give the IPC mutex to allow CPU2 to access shared data
+            give_ipc_mutex_cpu1();                                                // Give the IPC mutex to allow CPU2 to access shared data
             xSemaphoreGive(Mutex);                                                // Give the mutex after accessing shared data
 
             // Set reference position from button control if any button is pressed
@@ -259,17 +296,100 @@ static void ApplicationTask_Func(void *pvParameters)
             {
                 MTCL_SetReferencePosition(localCopyOfSharedData.ac_btn_manual_control_s.BTN_ReferencePosition__rad__F32);
             }
+
+            if (ECOM_DataAvailable_b)
+            {
+                switch(SharedDataCPU2TOCPU1.received_command_e)
+                {
+                    case AC_CMD_SET_MOVEMENT_PARAMS_e:
+                        MTCL_SetMovementParams(SharedDataCPU2TOCPU1.mtcl_movement_params_s.MaxSpeed__rad_s__F32,
+                                                SharedDataCPU2TOCPU1.mtcl_movement_params_s.MaxAccel__rad_s2__F32,
+                                                SharedDataCPU2TOCPU1.mtcl_movement_params_s.MaxTorque__Nm__F32);
+                        break;
+                    case AC_CMD_SET_REFERENCE_POSITION_e:
+                        MTCL_SetReferencePosition(SharedDataCPU2TOCPU1.reference_position_rad_F32);
+                        break;
+                    case AC_CMD_SET_MOVEMENT_ENABLE_STATE_e:
+                        FOC_SetEnableState(SharedDataCPU2TOCPU1.foc_enable_state_b);
+                        break;
+                    case AC_CMD_RESET_ERROR_FLAGS_e:
+                        if (SharedDataCPU2TOCPU1.reset_error_flags_b)
+                        {
+                            MTCL_ResetErrorFlags();
+                        }
+                        break;
+
+                    default:
+                        break;
+                }
+
+                ECOM_DataAvailable_b = False_b;
+            }
             // Perform application control tasks here
             MTCL_MainHandler(&localCopyOfSharedData.mda_data_s);        // Execution time is around 44 microseconds
 
             xSemaphoreTake(Mutex, portMAX_DELAY);                                 // Take the mutex before accessing shared data
+            xSemaphoreTake(IPCSharedMemoryMutex_cpu1, portMAX_DELAY);                               // Take the IPC mutex to synchronize with CPU2
+            take_ipc_mutex_cpu1();                                                // Take the IPC mutex to synchronize with CPU2
+
             SharedDataCPU1TOCPU2.foc_enable_state_b = FOC_GetEnableState();       // Update FOC enable state in shared data
             SharedDataCPU1TOCPU2.mtcl_control_s = *MTCL_GetControlState_ps();     // Update MTCL control struct in shared data
+
+            xSemaphoreGive(IPCSharedMemoryMutex_cpu1);                                              // Give the IPC mutex to allow CPU2 to access shared data
+            give_ipc_mutex_cpu1();                                                // Give the IPC mutex to allow CPU2 to access shared data
             xSemaphoreGive(Mutex);                                                // Give the mutex after accessing shared data
             
             // Increment the execution counter
             ctrApplicationTask++;
         }
+    }
+}
+
+__interrupt void isr_IPC2_cpu1(void)
+{
+    ECOM_DataAvailable_b = True_b; // Set the flag to indicate that new data from CPU2 is available
+
+    // Clear the IPC2 interrupt flag
+    PieCtrlRegs.PIEACK.bit.ACK1 = 1;			// Must acknowledge the PIE group
+    IpcRegs.IPCACK.bit.IPC2 = 1;                // Clear IPC2 flag
+    
+}
+
+__interrupt void isr_IPC0_cpu1(void)
+{
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    
+    xSemaphoreTakeFromISR(IPCSharedMemoryMutex_cpu1, &xHigherPriorityTaskWoken);
+
+    // Clear the IPC0 interrupt flag
+    PieCtrlRegs.PIEACK.bit.ACK1 = 1;			// Must acknowledge the PIE group
+	IpcRegs.IPCACK.bit.IPC0 = 1;                // Clear IPC0 flag
+    IpcRegs.IPCACK.bit.IPC7 = 1;                // Clear IPC7 flag
+    // Increment the interrupt event counter
+    ctrInterrputEventIPC0++;
+    
+    if (xHigherPriorityTaskWoken == pdTRUE)
+    {
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    }
+}
+
+__interrupt void isr_IPC1_cpu1(void)
+{
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    
+    xSemaphoreGiveFromISR(IPCSharedMemoryMutex_cpu1, &xHigherPriorityTaskWoken);
+
+    // Clear the IPC1 interrupt flag
+    PieCtrlRegs.PIEACK.bit.ACK1 = 1;			// Must acknowledge the PIE group
+    IpcRegs.IPCACK.bit.IPC1 = 1;                // Clear IPC1 flag
+    IpcRegs.IPCACK.bit.IPC8 = 1;                // Clear IPC8 flag
+    // Increment the interrupt event counter
+    ctrInterrputEventIPC1++;
+    
+    if (xHigherPriorityTaskWoken == pdTRUE)
+    {
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
     }
 }
 

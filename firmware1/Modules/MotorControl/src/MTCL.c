@@ -32,7 +32,7 @@ F32 s_MTCL_MaxSpeed__rad_s__F32             = DEFAULT_RUN_SPEED__rad_s__dF32;   
 F32 s_MTCL_MaxAccel__rad_s2__F32            = DEFAULT_RUN_ACCEL__rad_s2__dF32;                                      /**< Current value of maximum acceleration. */
 F32 s_MTCL_MaxTorque__Nm__F32               = DEFAULT_RUN_TORQUE__Nm__dF32;                                         /**< Current value of maximum Torque. - not used. */
 
-const F32 s_MTCL_MaxPosition__rad__F32      = 5.8448f;  // 10 cm in rad                                             /**< Maximum position for valid request. */
+F32 s_MTCL_MaxPosition__rad__F32            = 5.8448f;  // 10 cm in rad                                             /**< Maximum position for valid request. */
 F32 prev_request_pos__F32__                 = 0.0f;                                                                 /**< Previously requested position. */                                                                                                          /**< Debug variable. */
 
 /**
@@ -313,6 +313,11 @@ boolean MTCL_SetReferencePosition(const F32 new_position__rad__F32)
     return return_state_b;
 }
 
+F32 MTCL_GetReferencePosition_F32(void)
+{
+    return s_MTCL_ReferencePosition__rad__F32;
+}
+
 /**
  * @brief Get trajectory data
  * @returns pointer to trajectory data struct.
@@ -353,6 +358,10 @@ inline F32 MTCL_GetMaximumPosition_F32(void)
     return s_MTCL_MaxPosition__rad__F32;
 }
 
+inline void MTCL_SetMaximumPosition_F32(F32* new_max_position__rad__F32)
+{
+    s_MTCL_MaxPosition__rad__F32 = *new_max_position__rad__F32;
+}
 /**
  * @brief Resets motor control error flags.
  */

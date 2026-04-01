@@ -325,6 +325,10 @@ inline const MDA_Data_struct* MDA_GetData_ps(void)
     return (const MDA_Data_struct*)&s_MDA_data_s;
 }
 
+inline void MDA_SetData(const MDA_Data_struct* new_data_ps)
+{
+    s_MDA_data_s = *new_data_ps;
+}
 /**
  * @brief Resets linear position
  * @deprecated

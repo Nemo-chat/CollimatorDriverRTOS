@@ -1,7 +1,7 @@
 /*
  * dispCtrl.h
  *
- *  Created on: 10 mar. 2024 ã.
+ *  Created on: 10 mar. 2024 ï¿½.
  *      Author: vadym
  */
 
@@ -33,5 +33,6 @@ void float_to_char_array(F32 f, char* buffer, U16 precision);
 
 F32 ceiling_F32(F32 number);
 
-void DisplayRefresh(void);
+void DisplayRefresh(F32 AngularPosition_rad_F32, U16 OverTorqueError_f1, boolean FOCEnableState_b);
+
 #endif /* DISPCTRL_H_ */

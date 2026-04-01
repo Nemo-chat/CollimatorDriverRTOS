@@ -21,6 +21,18 @@
 #include <FOC.h>
 
 AC_BTNManualControl_struct s_AC_BTNManualControl_s = {False_b, 0.0f};    /**< Button manual control struct. */
+AC_CommandIndex_enum AC_LastReceivedCommand_e = AC_CMD_NONE_e;                          /**< Last received command index. */
+boolean AC_Reset_ErrorFlags_b = False_b;                                                        /**< Flag for resetting error flags in motor control module. */
+
+AC_CommandIndex_enum AC_GetLastReceivedCommand(void)
+{
+    return AC_LastReceivedCommand_e;
+}
+
+void AC_ClearLastReceivedCommand(void)
+{
+    AC_LastReceivedCommand_e = AC_CMD_NONE_e;
+}
 
 /**
  * @brief Control button initialization.
@@ -115,17 +127,21 @@ void AC_ExecuteCommand( const U16 * const command_payload_pU16,
                         U16 * response_data_pU16,
                         U16 * response_data_size_pU16 )
 {
+    AC_LastReceivedCommand_e = (AC_CommandIndex_enum)command_payload_pU16[0];
+
     if(AC_CORE_CHECK_INDEX_BOUND_dM_b(command_payload_pU16[0]))
     {
         AC_Functions[command_payload_pU16[0]]( (command_payload_pU16 + 1),
                                               (payload_size_U16 - 1),
                                               response_data_pU16,
                                               response_data_size_pU16 );
+
     }
     else
     {
         response_data_pU16[0] = INVALID_CMD_e;
         *response_data_size_pU16 = 1;
+        AC_LastReceivedCommand_e = AC_CMD_NONE_e;
     }
 }
 
@@ -281,7 +297,8 @@ static void AC_CMD_ResetErrorFlags( const void* const payload_p,
         *response_data_size_pU16 = 1;
         return;
     }
-    MTCL_ResetErrorFlags();
+    // MTCL_ResetErrorFlags();
+    AC_Reset_ErrorFlags_b = True_b;
     response_data_pU16[0] = RESPONSE_OK_e;
     *response_data_size_pU16 = 1;
 }

@@ -44,15 +44,24 @@ typedef struct
 
 }PC_Data_struct;                                /**< Trajectory structure. */
 
+typedef struct
+{
+    F32 MaxSpeed__rad_s__F32;                 /**< Maximum speed. */
+    F32 MaxAccel__rad_s2__F32;                /**< Maximum acceleration. */
+    F32 MaxTorque__Nm__F32;                   /**< Maximum torque. */
+} MTCL_MovementParams_struct;                /**< Movement parameters structure. */
+
 extern F32 s_MTCL_ReferencePosition__rad__F32;
 boolean MTCL_SetMovementParams(const F32 max_speed__rad_s__F32, const F32 max_accel__rad_s2__F32, const F32 max_torque__Nm__F32);
 void    MTCL_GetMovementParams(F32 * const max_speed__rad_s__F32, F32 * const max_accel__rad_s2__F32, F32 * const max_torque__Nm__F32);
 boolean MTCL_SetReferencePosition(const F32 new_position__rad__F32);
+F32     MTCL_GetReferencePosition_F32(void);
 void    MTCL_MainHandler(const MDA_Data_struct* mda_data_ps);
 void    MTCL_Init(void);
 const   PC_Data_struct* PC_GetData_ps(void);
 const   MTCL_Control_struct* MTCL_GetControlState_ps(void);
 F32     MTCL_GetMaximumPosition_F32(void);
+void    MTCL_SetMaximumPosition_F32(F32* new_max_position__rad__F32);
 void    MTCL_ResetErrorFlags(void);
 
 extern MTCL_Control_struct s_MTCL_Control_s;
