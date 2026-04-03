@@ -11,9 +11,6 @@
 
 void ISR_MotorControlHandler(void);
 
-void IPC_ISRvInit_CPU1(interrupt void (*ipc0_isr_cpu1)(void), interrupt void (*ipc1_isr_cpu1)(void), interrupt void (*ipc2_isr_cpu1)(void));
-void take_ipc_mutex_cpu1(void);
-void give_ipc_mutex_cpu1(void);
-//void ComutationU16();
+void IPC_ISRvInit_CPU1(interrupt void (*ipc_isr_cpu1)(void));
 
 #endif /* INTERRUPTSERVICEROUTINES_H_ */

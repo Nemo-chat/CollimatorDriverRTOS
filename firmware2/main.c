@@ -70,16 +70,13 @@ TaskHandle_t CommunicationTask, PrintTask;
 // Execution counters
 static volatile uint32_t ctrCommunicationTask = 0;
 static volatile uint32_t ctrPrintTask = 0;
-static volatile uint32_t ctrInterrputEventIPC0 = 0;
-static volatile uint32_t ctrInterrputEventIPC1 = 0;
+static volatile uint32_t ctrInterrputEventIPC_from_CPU1 = 0;
+
+boolean should_update_shared_data_b = False_b;
 
 uint32_t elapsedTime = 0;
 uint32_t startTime = 0;
 uint32_t endTime = 0;
-
-
-// Mutex for shared data access
-SemaphoreHandle_t IPCSharedMemoryMutex_cpu2; 
 
 // Shared data structure for communication between CPU1 and CPU2
 volatile SharedDataCPU1TOCPU2_struct SharedDataCPU1TOCPU2;
@@ -103,6 +100,9 @@ uint8_t ucHeap[ configTOTAL_HEAP_SIZE ];
 // Function prototypes
 static void CommunicationTask_Func(void *pvParameters);
 static void PrintTask_Func(void *pvParameters);
+void lockCPU2(void);
+void unlockCPU2(void);
+void setDataToCPU1(AC_CommandIndex_enum);
 
 // vApplicationGetIdleTaskMemory
 void vApplicationGetIdleTaskMemory( StaticTask_t **ppxIdleTaskTCBBuffer,
@@ -120,18 +120,14 @@ void vApplicationStackOverflowHook( TaskHandle_t xTask, char *pcTaskName )
     while(1);
 }
 
-__interrupt void isr_IPC0_cpu2(void);
-__interrupt void isr_IPC1_cpu2(void);
+__interrupt void ipc_isr_cpu2(void);
 
 void main(void)
 {
-    // Create a semaphore.
-    IPCSharedMemoryMutex_cpu2 = xSemaphoreCreateMutex();
-
     /* Initialization */
     Interrupt_initModule();       // Need reveiw if it neccessary
     Interrupt_initVectorTable();  // Need reveiw if it neccessary
-    IPC_ISRvInit_CPU2(&isr_IPC0_cpu2, &isr_IPC1_cpu2);          // Initialize IPC ISRs for CPU2
+    IPC_ISRvInit_CPU2(&ipc_isr_cpu2);          // Initialize IPC ISRs for CPU2
     spi_vInit(800000);
     dispCtrl_vInitDisplay();
     ATB_Init();
@@ -182,53 +178,21 @@ static void CommunicationTask_Func(void *pvParameters)
     SharedDataCPU1TOCPU2_struct localCopyOfSharedData;
     for(;;)
     {
-        xSemaphoreTake(IPCSharedMemoryMutex_cpu2, portMAX_DELAY);                               // Take the mutex before accessing shared data
-        take_ipc_mutex_cpu2();                                                // Take the IPC mutex to synchronize with CPU1
-        
+        lockCPU2();
+
         MDA_SetData(&SharedDataCPU1TOCPU2.mda_data_s);         // Update MDA data in shared structure
         MTCL_SetMovementParams(SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxSpeed__rad_s__F32,
                                 SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxAccel__rad_s2__F32,
                                 SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxTorque__Nm__F32); // Update MTCL movement parameters in shared structure
         MTCL_SetMaximumPosition_F32(&SharedDataCPU1TOCPU2.mtcl_maximum_position_rad_F32); // Update MTCL maximum position in shared structure
        
-        xSemaphoreGive(IPCSharedMemoryMutex_cpu2);                                              // Give the mutex after accessing shared data
-        give_ipc_mutex_cpu2();                                                // Give the IPC mutex to allow CPU1 to access shared data
+        unlockCPU2();
         
         ECOM_MainHandler();        
 
         AC_CommandIndex_enum received_cmd = AC_GetLastReceivedCommand();
-        boolean should_update_shared_data_b = False_b;
-
-        switch(received_cmd)
-        {
-            case AC_CMD_SET_MOVEMENT_PARAMS_e:
-                MTCL_GetMovementParams(&SharedDataCPU2TOCPU1.mtcl_movement_params_s.MaxSpeed__rad_s__F32,
-                                        &SharedDataCPU2TOCPU1.mtcl_movement_params_s.MaxAccel__rad_s2__F32,
-                                        &SharedDataCPU2TOCPU1.mtcl_movement_params_s.MaxTorque__Nm__F32);
-                SharedDataCPU2TOCPU1.received_command_e = received_cmd;
-                should_update_shared_data_b = True_b;
-                break;
-            case AC_CMD_SET_REFERENCE_POSITION_e:
-                SharedDataCPU2TOCPU1.reference_position_rad_F32 = MTCL_GetReferencePosition_F32();
-                SharedDataCPU2TOCPU1.received_command_e = received_cmd;
-                should_update_shared_data_b = True_b;
-                break;
-            case AC_CMD_SET_MOVEMENT_ENABLE_STATE_e:
-                SharedDataCPU2TOCPU1.foc_enable_state_b = FOC_GetEnableState();
-                SharedDataCPU2TOCPU1.received_command_e = received_cmd;
-                should_update_shared_data_b = True_b;
-                break;
-            case AC_CMD_RESET_ERROR_FLAGS_e:
-                SharedDataCPU2TOCPU1.reset_error_flags_b = AC_Reset_ErrorFlags_b;
-                SharedDataCPU2TOCPU1.received_command_e = received_cmd;
-                should_update_shared_data_b = True_b;
-                break;
-
-            default:
-                SharedDataCPU2TOCPU1.received_command_e = AC_CMD_NONE_e;
-                should_update_shared_data_b = False_b;
-                break;
-        }
+        
+        setDataToCPU1(received_cmd);
 
         /* Reset command marker for next cycle */
         AC_ClearLastReceivedCommand();
@@ -259,16 +223,14 @@ static void PrintTask_Func(void *pvParameters)
 
     for(;;)
     {
-        xSemaphoreTake(IPCSharedMemoryMutex_cpu2, portMAX_DELAY);                               // Take the mutex before accessing shared data
-        take_ipc_mutex_cpu2();
+        lockCPU2(); 
         
         AngularPosition_rad_F32 = SharedDataCPU1TOCPU2.mda_data_s.angular_position__rad__F32;
         OverTorqueError_f1 = SharedDataCPU1TOCPU2.mtcl_control_s.over_torque_error_f1;
         FOCEnableState_b = SharedDataCPU1TOCPU2.foc_enable_state_b;
         
-        xSemaphoreGive(IPCSharedMemoryMutex_cpu2);                                              // Give the mutex after accessing shared data
-        give_ipc_mutex_cpu2();                                                // Give the IPC mutex to allow CPU1 to access shared data
-        
+        unlockCPU2();
+
         DisplayRefresh(AngularPosition_rad_F32, OverTorqueError_f1, FOCEnableState_b);
         
         // Increment the execution counter
@@ -278,42 +240,80 @@ static void PrintTask_Func(void *pvParameters)
     }
 }
 
-__interrupt void isr_IPC0_cpu2(void)
+void setDataToCPU1(AC_CommandIndex_enum received_cmd)
 {
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    
-    xSemaphoreTakeFromISR(IPCSharedMemoryMutex_cpu2, &xHigherPriorityTaskWoken);
+    switch(received_cmd)
+    {
+    case AC_CMD_SET_MOVEMENT_PARAMS_e:
+        MTCL_GetMovementParams(&SharedDataCPU2TOCPU1.mtcl_movement_params_s.MaxSpeed__rad_s__F32,
+                                &SharedDataCPU2TOCPU1.mtcl_movement_params_s.MaxAccel__rad_s2__F32,
+                                &SharedDataCPU2TOCPU1.mtcl_movement_params_s.MaxTorque__Nm__F32);
+        SharedDataCPU2TOCPU1.received_command_e = received_cmd;
+        should_update_shared_data_b = True_b;
+        break;
+    case AC_CMD_SET_REFERENCE_POSITION_e:
+        SharedDataCPU2TOCPU1.reference_position_rad_F32 = MTCL_GetReferencePosition_F32();
+        SharedDataCPU2TOCPU1.received_command_e = received_cmd;
+        should_update_shared_data_b = True_b;
+        break;
+    case AC_CMD_SET_MOVEMENT_ENABLE_STATE_e:
+        SharedDataCPU2TOCPU1.foc_enable_state_b = FOC_GetEnableState();
+        SharedDataCPU2TOCPU1.received_command_e = received_cmd;
+        should_update_shared_data_b = True_b;
+        break;
+    case AC_CMD_RESET_ERROR_FLAGS_e:
+        SharedDataCPU2TOCPU1.reset_error_flags_b = AC_Reset_ErrorFlags_b;
+        SharedDataCPU2TOCPU1.received_command_e = received_cmd;
+        should_update_shared_data_b = True_b;
+        break;
 
-    // Clear the IPC0 interrupt flag
-    PieCtrlRegs.PIEACK.bit.ACK1 = 1;			// Must acknowledge the PIE group
-	IpcRegs.IPCACK.bit.IPC0 = 1;                // Clear IPC0 flag
-    IpcRegs.IPCACK.bit.IPC7 = 1;                // Clear IPC7 flag
-    // Increment the interrupt event counter
-    ctrInterrputEventIPC0++;
+    default:
+        SharedDataCPU2TOCPU1.received_command_e = AC_CMD_NONE_e;
+        should_update_shared_data_b = False_b;
+        break;
+    }
+}
+
+__interrupt void ipc_isr_cpu2(void)
+{
+    ctrInterrputEventIPC_from_CPU1++;
     
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    // Notify the Communication Task that new data is available from CPU1
+    vTaskNotifyGiveFromISR(CommunicationTask, &xHigherPriorityTaskWoken);
+    vTaskNotifyGiveFromISR(PrintTask, &xHigherPriorityTaskWoken);
+
+    // Clear the IPC interrupt flag
+    IpcRegs.IPCCLR.bit.IPC1 = 1;                // Clear the IPC1 interrupt flag
+    PieCtrlRegs.PIEACK.bit.ACK1 = 1;			// Must acknowledge the PIE group
+ 
     if (xHigherPriorityTaskWoken == pdTRUE)
     {
         portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
     }
 }
 
-__interrupt void isr_IPC1_cpu2(void)
+void lockCPU2(void)
 {
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    
-    xSemaphoreGiveFromISR(IPCSharedMemoryMutex_cpu2, &xHigherPriorityTaskWoken);
-
-    // Clear the IPC1 interrupt flag
-    PieCtrlRegs.PIEACK.bit.ACK1 = 1;			// Must acknowledge the PIE group
-    IpcRegs.IPCACK.bit.IPC1 = 1;                // Clear IPC1 flag
-    IpcRegs.IPCACK.bit.IPC8 = 1;                // Clear IPC8 flag
-    // Increment the interrupt event counter
-    ctrInterrputEventIPC1++;
-    
-    if (xHigherPriorityTaskWoken == pdTRUE)
+    while(1)
     {
-        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+        if(IpcRegs.IPCFLG.bit.IPC0 == 0)
+        {
+            IpcRegs.IPCSET.bit.IPC0 = 1;
+
+            if(IpcRegs.IPCFLG.bit.IPC0 == 1)
+            {
+                return; 
+            }
+        }
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
     }
+}
+
+void unlockCPU2(void)
+{
+    IpcRegs.IPCCLR.bit.IPC0 = 1;
+    IpcRegs.IPCSET.bit.IPC1 = 1; 
 }
 
 /**
