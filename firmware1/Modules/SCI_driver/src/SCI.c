@@ -6,27 +6,26 @@
  */
 #include <SCI.h>
 
+void SCI_PinsInit(void)
+{
+    EALLOW;
+    /* SCIRXDA */
+    GpioCtrlRegs.GPCGMUX1.bit.GPIO64 = 1;
+    GpioCtrlRegs.GPCMUX1.bit.GPIO64 = 2;
+    GpioCtrlRegs.GPCCSEL1.bit.GPIO64 = 3; // select master core CPU2
+
+    /* SCITXDA */
+    GpioCtrlRegs.GPCGMUX1.bit.GPIO65 = 1;
+    GpioCtrlRegs.GPCMUX1.bit.GPIO65 = 2;
+    GpioCtrlRegs.GPCCSEL1.bit.GPIO65 = 3; // select master core CPU2
+
+    EDIS;
+}
 void SCI_Init(void)
 {
     /* GPIO Setup */
 
     EALLOW;
-    /* SCIRXDA */
-    GpioCtrlRegs.GPCGMUX1.bit.GPIO64 = 1;
-    GpioCtrlRegs.GPCMUX1.bit.GPIO64 = 2;
-
-    /* SCITXDA */
-    GpioCtrlRegs.GPCGMUX1.bit.GPIO65 = 1;
-    GpioCtrlRegs.GPCMUX1.bit.GPIO65 = 2;
-
-//    /* SCIRXDA */
-//    GpioCtrlRegs.GPAGMUX2.bit.GPIO28 = 0;
-//    GpioCtrlRegs.GPAMUX2.bit.GPIO28 = 1;
-//
-//    /* SCITXDA */
-//    GpioCtrlRegs.GPAGMUX2.bit.GPIO29 = 0;
-//    GpioCtrlRegs.GPAMUX2.bit.GPIO29 = 1;
-
 
     // Clock config
     CpuSysRegs.PCLKCR7.bit.SCI_A = 1;

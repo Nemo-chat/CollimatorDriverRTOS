@@ -159,10 +159,9 @@ void main(void)
     Interrupt_initVectorTable();  // Need reveiw if it neccessary
     IPC_ISRvInit_CPU1(&ipc_isr_cpu1);          // Initialize IPC ISRs for CPU1
     spi_PinsInit();                                 /* Initialize SPI pins, select master core CPU2 */
-    dispCtrl_vInitDisplay();
+    SCI_PinsInit();                                 /* Initialize SCI pins, select master core CPU2 */
     ATB_Init();
     PWM_Init();
-    SCI_Init();
     FOC_CommutationAlignment();
     MDA_Init(&MDA_AdcConverstionCompleteIsr);
     MTCL_Init();
