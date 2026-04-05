@@ -36,10 +36,12 @@
 // Macro to define stack size of individual tasks
 #define COM_TASK_STACK_SIZE 1024
 #define PRINT_TASK_STACK_SIZE 256
+#define READ_FROM_SHARED_MEMORY_TASK_STACK_SIZE 256
 
 // Macro to define priorities of individual tasks
-#define COM_TASK_PRIORITY   2
+#define COM_TASK_PRIORITY   1
 #define PRINT_TASK_PRIORITY   1
+#define READ_FROM_SHARED_MEMORY_TASK_PRIORITY   2
 
 #define STACK_SIZE  256U
 
@@ -65,12 +67,13 @@ typedef struct
 }SharedDataCPU2TOCPU1_struct;
 
 // Task handles
-TaskHandle_t CommunicationTask, PrintTask;
+TaskHandle_t CommunicationTask, PrintTask, ReadFromSharedMemoryTask;
 
 // Execution counters
 static volatile uint32_t ctrCommunicationTask = 0;
 static volatile uint32_t ctrPrintTask = 0;
-static volatile uint32_t ctrInterrputEventIPC_from_CPU1 = 0;
+static volatile uint32_t ctrInterruptEventIPC_from_CPU1 = 0;
+static volatile uint32_t ctrReadFromSharedMemoryTask = 0;
 
 boolean should_update_shared_data_b = False_b;
 
@@ -100,6 +103,7 @@ uint8_t ucHeap[ configTOTAL_HEAP_SIZE ];
 // Function prototypes
 static void CommunicationTask_Func(void *pvParameters);
 static void PrintTask_Func(void *pvParameters);
+static void ReadFromSharedMemoryTask_Func(void *pvParameters);
 void lockCPU2(void);
 void unlockCPU2(void);
 void setDataToCPU1(AC_CommandIndex_enum);
@@ -120,14 +124,14 @@ void vApplicationStackOverflowHook( TaskHandle_t xTask, char *pcTaskName )
     while(1);
 }
 
-__interrupt void ipc_isr_cpu2(void);
+__interrupt void ipc_isr_cpu1(void);
 
 void main(void)
 {
     /* Initialization */
     Interrupt_initModule();       // Need reveiw if it neccessary
     Interrupt_initVectorTable();  // Need reveiw if it neccessary
-    IPC_ISRvInit_CPU2(&ipc_isr_cpu2);          // Initialize IPC ISRs for CPU2
+    IPC_ISRvInit_CPU2(&ipc_isr_cpu1);          // Initialize IPC ISRs for CPU2
     spi_vInit(800000);
     dispCtrl_vInitDisplay();
     ATB_Init();
@@ -154,6 +158,16 @@ void main(void)
         ESTOP0;
     }
 
+    if(xTaskCreate(ReadFromSharedMemoryTask_Func, 
+                   (const char *)"ReadFromSharedMemoryTask", 
+                   READ_FROM_SHARED_MEMORY_TASK_STACK_SIZE, 
+                   NULL,
+                   (tskIDLE_PRIORITY + READ_FROM_SHARED_MEMORY_TASK_PRIORITY), 
+                   &ReadFromSharedMemoryTask) != pdTRUE)
+    {
+        ESTOP0;
+    }
+
     // IPC synchronization with CPU1 
     IpcRegs.IPCSET.bit.IPC17 = 1;
     while(IpcRegs.IPCFLG.bit.IPC17 != 0);
@@ -168,16 +182,14 @@ void main(void)
     }
 }
 
-/**
- * @brief Function for the Process Inputs task.
- */
-static void CommunicationTask_Func(void *pvParameters)
+static void ReadFromSharedMemoryTask_Func(void *pvParameters)
 {
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
-    SharedDataCPU1TOCPU2_struct localCopyOfSharedData;
+    
     for(;;)
     {
+
         lockCPU2();
 
         MDA_SetData(&SharedDataCPU1TOCPU2.mda_data_s);         // Update MDA data in shared structure
@@ -185,8 +197,26 @@ static void CommunicationTask_Func(void *pvParameters)
                                 SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxAccel__rad_s2__F32,
                                 SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxTorque__Nm__F32); // Update MTCL movement parameters in shared structure
         MTCL_SetMaximumPosition_F32(&SharedDataCPU1TOCPU2.mtcl_maximum_position_rad_F32); // Update MTCL maximum position in shared structure
-       
+        FOC_SetEnableState(SharedDataCPU1TOCPU2.foc_enable_state_b); // Update FOC enable state in shared structure
+        s_MTCL_Control_s.over_torque_error_f1 = SharedDataCPU1TOCPU2.mtcl_control_s.over_torque_error_f1; // Update MTCL control struct in shared structure
+        
         unlockCPU2();
+        
+        ctrReadFromSharedMemoryTask++;  
+        vTaskDelayUntil( &xLastWakeTime, pdMS_TO_TICKS( 50 ) );
+
+    }
+}
+/**
+ * @brief Function for the Process Inputs task.
+ */
+static void CommunicationTask_Func(void *pvParameters)
+{
+    TickType_t xLastWakeTime;
+    xLastWakeTime = xTaskGetTickCount();
+    
+    for(;;)
+    {
         
         ECOM_MainHandler();        
 
@@ -205,7 +235,7 @@ static void CommunicationTask_Func(void *pvParameters)
 
         // Increment the execution counter
         ctrCommunicationTask++;
-        vTaskDelayUntil( &xLastWakeTime, pdMS_TO_TICKS( 120 ) );
+        vTaskDelayUntil( &xLastWakeTime, pdMS_TO_TICKS( 100 ) );
     }
 }
 
@@ -217,21 +247,12 @@ static void PrintTask_Func(void *pvParameters)
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
 
-    F32 AngularPosition_rad_F32;
-    U16 OverTorqueError_f1;
-    boolean FOCEnableState_b;
-
     for(;;)
     {
-        lockCPU2(); 
-        
-        AngularPosition_rad_F32 = SharedDataCPU1TOCPU2.mda_data_s.angular_position__rad__F32;
-        OverTorqueError_f1 = SharedDataCPU1TOCPU2.mtcl_control_s.over_torque_error_f1;
-        FOCEnableState_b = SharedDataCPU1TOCPU2.foc_enable_state_b;
-        
-        unlockCPU2();
 
-        DisplayRefresh(AngularPosition_rad_F32, OverTorqueError_f1, FOCEnableState_b);
+        DisplayRefresh(MDA_GetData_ps()->angular_position__rad__F32, 
+                        MTCL_GetControlState_ps()->over_torque_error_f1, 
+                        FOC_GetEnableState());
         
         // Increment the execution counter
         ctrPrintTask++;
@@ -274,14 +295,13 @@ void setDataToCPU1(AC_CommandIndex_enum received_cmd)
     }
 }
 
-__interrupt void ipc_isr_cpu2(void)
+__interrupt void ipc_isr_cpu1(void)
 {
-    ctrInterrputEventIPC_from_CPU1++;
+    ctrInterruptEventIPC_from_CPU1++;
     
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     // Notify the Communication Task that new data is available from CPU1
-    vTaskNotifyGiveFromISR(CommunicationTask, &xHigherPriorityTaskWoken);
-    vTaskNotifyGiveFromISR(PrintTask, &xHigherPriorityTaskWoken);
+    vTaskNotifyGiveFromISR(ReadFromSharedMemoryTask, &xHigherPriorityTaskWoken);
 
     // Clear the IPC interrupt flag
     IpcRegs.IPCCLR.bit.IPC1 = 1;                // Clear the IPC1 interrupt flag
@@ -297,7 +317,7 @@ void lockCPU2(void)
 {
     while(1)
     {
-        if(IpcRegs.IPCFLG.bit.IPC0 == 0)
+        if(IpcRegs.IPCSTS.bit.IPC0 == 0)
         {
             IpcRegs.IPCSET.bit.IPC0 = 1;
 

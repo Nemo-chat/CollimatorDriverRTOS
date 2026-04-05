@@ -37,7 +37,7 @@
 
 #define configUSE_PREEMPTION                  1
 #define configUSE_IDLE_HOOK                   0 // errory ak 1 ?
-#define configUSE_TIME_SLICING                1 // distributes processing time between tasks with the same priorities, even if they are not inferior in queue
+#define configUSE_TIME_SLICING                0 // distributes processing time between tasks with the same priorities, even if they are not inferior in queue
 #define configUSE_TICK_HOOK                   0
 #define configCPU_CLOCK_HZ                    ( ( unsigned long ) 200000000 )
 #define configTICK_RATE_HZ                    ( ( TickType_t ) 2000 )
