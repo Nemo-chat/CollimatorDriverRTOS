@@ -39,8 +39,8 @@
 # define WRITE_TO_SHARED_MEMORY_TASK_STACK_SIZE 256
 
 // Macro to define priorities of individual tasks
-#define PROCESS_INPUT_TASK_PRIORITY   3
-#define APPLICATION_TASK_PRIORITY   2
+#define PROCESS_INPUT_TASK_PRIORITY   1
+#define APPLICATION_TASK_PRIORITY   1
 #define WRITE_TO_SHARED_MEMORY_TASK_PRIORITY   1
 
 #define STACK_SIZE  256U
@@ -75,18 +75,16 @@ static volatile uint32_t ctrInterruptEventIPC1_from_CPU2 = 0;
 static volatile uint32_t ctrInterruptEventIPC2_from_CPU2 = 0;
 static volatile uint32_t ctrWriteToSharedMemoryTask = 0;
 static volatile uint32_t ctrWriteToSharedMemoryTaskHit = 0;
-uint32_t elapsedTime = 0;
+
+uint8_t ADCInterruptsNumber = 10;
+static volatile float elapsedTime = 0;
 uint32_t startTime = 0;
 uint32_t endTime = 0;
-
-boolean ECOM_DataAvailable_b = False_b;
 
 // The Semaphore for synchronization ISR by ADC and Process Inputs Task.
 SemaphoreHandle_t SyncSemaphore;
 // Mutex for shared data access
 SemaphoreHandle_t Mutex; 
-// Binary semaphore used by ApplicationTask -> WriteToSharedMemoryTask
-SemaphoreHandle_t AppToWrite_Sem;
 
 // Shared data structure for communication between CPU1 and CPU2
 volatile SharedDataCPU1TOCPU2_struct SharedDataCPU1TOCPU2;
@@ -138,6 +136,7 @@ void vApplicationStackOverflowHook( TaskHandle_t xTask, char *pcTaskName )
 interrupt void MDA_AdcConverstionCompleteIsr(void)
 {
     // ISR_MotorControlHandler();
+    
     ctrInterruptEvent++;
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     xSemaphoreGiveFromISR(SyncSemaphore, &xHigherPriorityTaskWoken);
@@ -160,7 +159,6 @@ void main(void)
     // Create a semaphore.
     SyncSemaphore = xSemaphoreCreateBinary();
     Mutex = xSemaphoreCreateMutex();
-    AppToWrite_Sem = xSemaphoreCreateBinary();
 
     /* Initialization */
     mcu_vInitClocks();                              /* Initialize uC clock system. */
@@ -242,22 +240,23 @@ void main(void)
 
 static void WriteToSharedMemoryTask_Func(void *pvParameters)
 {
+
     for(;;)
     {
         ctrWriteToSharedMemoryTaskHit++;
-        /* Wait for application to signal writer via semaphore */
-        xSemaphoreTake(AppToWrite_Sem, portMAX_DELAY);
-
-        lockCPU1();
-
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        // lockCPU1();
         SharedDataCPU1TOCPU2.mda_data_s = *MDA_GetData_ps();                 // Read updated data from shared memory
         SharedDataCPU1TOCPU2.ac_btn_manual_control_s = *AC_GetBTNData_ps();  // Read updated button control data from shared memory
         SharedDataCPU1TOCPU2.foc_enable_state_b = FOC_GetEnableState();      // Update FOC enable state in shared data
         SharedDataCPU1TOCPU2.mtcl_control_s = *MTCL_GetControlState_ps();    // Update MTCL control struct in shared data
+        // unlockCPU1();
 
-        unlockCPU1();
+        IpcRegs.IPCSET.bit.IPC3 = 1; // Generate interrupt to notify CPU2 about updated data
+        while(IpcRegs.IPCSTS.bit.IPC3 != 0); // Wait for CPU2 to acknowledge the update
 
         ctrWriteToSharedMemoryTask++;
+
     }
 }
 
@@ -274,7 +273,7 @@ static void ProcessInputsTask_Func(void *pvParameters)
         ATB_IncrementTime();          
         // Process the inputs and update the data structure with newly 
         // acquired measurement data from the ADC and QEP.
-        MDA_UpdateData();             // Execution time is around 47 microseconds
+        MDA_UpdateData();             // Execution time is around 4.7 microseconds
         AC_ManualControlHandler(); 
 
         xTaskNotifyGive(ApplicationTask); // Notify the Application Task that new data is available
@@ -298,22 +297,27 @@ static void ApplicationTask_Func(void *pvParameters)
         ulEventToProcess = ulTaskNotifyTake( pdTRUE, portMAX_DELAY );
         if (ulEventToProcess != 0)
         {   
-
             // Set reference position from button control if any button is pressed
             if (AC_GetBTNData_ps()->any_button_pressed_b)
             {
                 MTCL_SetReferencePosition(AC_GetBTNData_ps()->BTN_ReferencePosition__rad__F32);
             }
-            // Process any received command from CPU2 via shared memory and update control parameters accordingly
-            if (ECOM_DataAvailable_b)
+            
+            // CpuTimer1Regs.TCR.bit.TRB = 1;
+            // Perform application control tasks here
+            IpcRegs.IPCSET.bit.IPC10 = 1;
+            MTCL_MainHandler();        // Execution time is around 10 microseconds
+            IpcRegs.IPCCLR.bit.IPC10 = 1;
+            // elapsedTime = (float)(CpuTimer1Regs.PRD.all - CpuTimer1Regs.TIM.all) * 0.005; 
+
+            static uint8_t ApplicationCounter = 0;
+            ApplicationCounter++;
+            if (ApplicationCounter >= ADCInterruptsNumber)
             {
-                getDataFromCPU2();
+                ApplicationCounter = 0;
+                xTaskNotifyGive(WriteToSharedMemoryTask);
             }
 
-            // Perform application control tasks here
-            MTCL_MainHandler();        // Execution time is around 44 microseconds
-
-            xSemaphoreGive(AppToWrite_Sem); // Signal WriteToSharedMemoryTask via semaphore
             // Increment the execution counter
             ctrApplicationTask++;
         }
@@ -347,15 +351,13 @@ void getDataFromCPU2(void)
         default:
             break;
     }
-
-    ECOM_DataAvailable_b = False_b;
 }
 
 __interrupt void ipc2_isr_cpu2(void)
 {
     ctrInterruptEventIPC2_from_CPU2++;
 
-    ECOM_DataAvailable_b = True_b; // Set flag to indicate that new data is available from CPU2
+    getDataFromCPU2(); // Read the command and data sent by CPU2 and update control parameters accordingly
     // Clear the IPC interrupt flag
     IpcRegs.IPCACK.bit.IPC2 = 1;                // Clear the IPC2 interrupt flag
     PieCtrlRegs.PIEACK.bit.ACK1 = 1;			// Must acknowledge the PIE group

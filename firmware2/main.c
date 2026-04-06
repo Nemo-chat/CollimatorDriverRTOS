@@ -36,12 +36,10 @@
 // Macro to define stack size of individual tasks
 #define COM_TASK_STACK_SIZE 1024
 #define PRINT_TASK_STACK_SIZE 256
-#define READ_FROM_SHARED_MEMORY_TASK_STACK_SIZE 256
 
 // Macro to define priorities of individual tasks
 #define COM_TASK_PRIORITY   1
 #define PRINT_TASK_PRIORITY   1
-#define READ_FROM_SHARED_MEMORY_TASK_PRIORITY   2
 
 #define STACK_SIZE  256U
 
@@ -77,7 +75,7 @@ static volatile uint32_t ctrReadFromSharedMemoryTask = 0;
 
 boolean should_update_shared_data_b = False_b;
 
-uint32_t elapsedTime = 0;
+float elapsedTime = 0;
 uint32_t startTime = 0;
 uint32_t endTime = 0;
 
@@ -125,13 +123,14 @@ void vApplicationStackOverflowHook( TaskHandle_t xTask, char *pcTaskName )
 }
 
 __interrupt void ipc_isr_cpu1(void);
+__interrupt void ipc3_isr_cpu1(void);
 
 void main(void)
 {
     /* Initialization */
     Interrupt_initModule();       // Need reveiw if it neccessary
     Interrupt_initVectorTable();  // Need reveiw if it neccessary
-    IPC_ISRvInit_CPU2(&ipc_isr_cpu1);          // Initialize IPC ISRs for CPU2
+    IPC_ISRvInit_CPU2(&ipc_isr_cpu1, &ipc3_isr_cpu1);          // Initialize IPC ISRs for CPU2
     spi_vInit(800000);
     dispCtrl_vInitDisplay();
     ATB_Init();
@@ -158,16 +157,6 @@ void main(void)
         ESTOP0;
     }
 
-    if(xTaskCreate(ReadFromSharedMemoryTask_Func, 
-                   (const char *)"ReadFromSharedMemoryTask", 
-                   READ_FROM_SHARED_MEMORY_TASK_STACK_SIZE, 
-                   NULL,
-                   (tskIDLE_PRIORITY + READ_FROM_SHARED_MEMORY_TASK_PRIORITY), 
-                   &ReadFromSharedMemoryTask) != pdTRUE)
-    {
-        ESTOP0;
-    }
-
     // IPC synchronization with CPU1 
     IpcRegs.IPCSET.bit.IPC17 = 1;
     while(IpcRegs.IPCFLG.bit.IPC17 != 0);
@@ -182,31 +171,6 @@ void main(void)
     }
 }
 
-static void ReadFromSharedMemoryTask_Func(void *pvParameters)
-{
-    TickType_t xLastWakeTime;
-    xLastWakeTime = xTaskGetTickCount();
-    
-    for(;;)
-    {
-
-        lockCPU2();
-
-        MDA_SetData(&SharedDataCPU1TOCPU2.mda_data_s);         // Update MDA data in shared structure
-        MTCL_SetMovementParams(SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxSpeed__rad_s__F32,
-                                SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxAccel__rad_s2__F32,
-                                SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxTorque__Nm__F32); // Update MTCL movement parameters in shared structure
-        MTCL_SetMaximumPosition_F32(&SharedDataCPU1TOCPU2.mtcl_maximum_position_rad_F32); // Update MTCL maximum position in shared structure
-        FOC_SetEnableState(SharedDataCPU1TOCPU2.foc_enable_state_b); // Update FOC enable state in shared structure
-        s_MTCL_Control_s.over_torque_error_f1 = SharedDataCPU1TOCPU2.mtcl_control_s.over_torque_error_f1; // Update MTCL control struct in shared structure
-        
-        unlockCPU2();
-        
-        ctrReadFromSharedMemoryTask++;  
-        vTaskDelayUntil( &xLastWakeTime, pdMS_TO_TICKS( 50 ) );
-
-    }
-}
 /**
  * @brief Function for the Process Inputs task.
  */
@@ -226,16 +190,10 @@ static void CommunicationTask_Func(void *pvParameters)
 
         /* Reset command marker for next cycle */
         AC_ClearLastReceivedCommand();
-        // Generate interrupt to notify CPU1 about updated data if a valid command was received and processed
-        if (should_update_shared_data_b)
-        {
-            IpcRegs.IPCSET.bit.IPC2 = 1; 
-            while(IpcRegs.IPCSTS.bit.IPC2 != 0); // Wait for CPU1 to acknowledge the update
-        }
 
         // Increment the execution counter
         ctrCommunicationTask++;
-        vTaskDelayUntil( &xLastWakeTime, pdMS_TO_TICKS( 100 ) );
+        vTaskDelayUntil( &xLastWakeTime, pdMS_TO_TICKS( 10 ) );
     }
 }
 
@@ -249,6 +207,7 @@ static void PrintTask_Func(void *pvParameters)
 
     for(;;)
     {
+        elapsedTime = (float)(CpuTimer1Regs.PRD.all - CpuTimer1Regs.TIM.all) * 0.005; // Calculate elapsed time in seconds (assuming 200 MHz timer clock)
 
         DisplayRefresh(MDA_GetData_ps()->angular_position__rad__F32, 
                         MTCL_GetControlState_ps()->over_torque_error_f1, 
@@ -256,7 +215,8 @@ static void PrintTask_Func(void *pvParameters)
         
         // Increment the execution counter
         ctrPrintTask++;
-        
+
+        CpuTimer1Regs.TCR.bit.TRB = 1;
         vTaskDelayUntil( &xLastWakeTime, pdMS_TO_TICKS( 100 ) );
     }
 }
@@ -293,6 +253,37 @@ void setDataToCPU1(AC_CommandIndex_enum received_cmd)
         should_update_shared_data_b = False_b;
         break;
     }
+
+    if (should_update_shared_data_b)
+    {
+        while (IpcRegs.IPCSTS.bit.IPC10 != 0); // IPC handshake cannot be executed during ApplicationTask execution
+        IpcRegs.IPCSET.bit.IPC2 = 1; 
+        while(IpcRegs.IPCSTS.bit.IPC2 != 0); // Wait for CPU1 to acknowledge the update
+        should_update_shared_data_b = False_b;
+    }
+}
+
+__interrupt void ipc3_isr_cpu1(void)
+{
+    MDA_SetData(&SharedDataCPU1TOCPU2.mda_data_s);         // Update MDA data in shared structure
+    MTCL_SetMovementParams(SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxSpeed__rad_s__F32,
+                            SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxAccel__rad_s2__F32,
+                            SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxTorque__Nm__F32); // Update MTCL movement parameters in shared structure
+    MTCL_SetMaximumPosition_F32(&SharedDataCPU1TOCPU2.mtcl_maximum_position_rad_F32); // Update MTCL maximum position in shared structure
+    FOC_SetEnableState(SharedDataCPU1TOCPU2.foc_enable_state_b); // Update FOC enable state in shared structure
+    s_MTCL_Control_s.over_torque_error_f1 = SharedDataCPU1TOCPU2.mtcl_control_s.over_torque_error_f1; // Update MTCL control struct in shared structure
+
+    uint8_t i;
+    for (i = 0; i < 10; i++) 
+    {
+        ATB_IncrementTime();
+    }
+
+    // Clear the IPC interrupt flag
+    IpcRegs.IPCACK.bit.IPC3 = 1;                // Clear the IPC3 interrupt flag
+    PieCtrlRegs.PIEACK.bit.ACK1 = 1;			// Must acknowledge the PIE group
+    ctrReadFromSharedMemoryTask++;
+    portYIELD_FROM_ISR(pdTRUE);
 }
 
 __interrupt void ipc_isr_cpu1(void)

@@ -72,7 +72,7 @@ void PWM_Init(void)
     EPwm3Regs.ETSEL.bit.SOCBEN          = (U16)1;              /* Enable start of conversion pulse. */
     EPwm3Regs.ETSEL.bit.SOCBSEL         = (U16)2;              /* Start of conversion pulse on counter max value. */
     EPwm3Regs.ETPS.bit.SOCPSSEL         = (U16)1;              
-    EPwm3Regs.ETSOCPS.bit.SOCAPRD2      = (U16)1;
+    EPwm3Regs.ETSOCPS.bit.SOCAPRD2      = (U16)10;
     EPwm3Regs.ETSOCPS.bit.SOCBPRD2      = (U16)10; 
 
     CpuSysRegs.PCLKCR0.bit.TBCLKSYNC    = (U16)1;               /* Sync PWM clocks */
