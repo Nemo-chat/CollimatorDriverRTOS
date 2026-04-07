@@ -94,14 +94,14 @@ static void AC_CMD_SetMovmentEnableState( const void* const payload_p,
 
 static AC_ControlFunction_pF AC_Functions[] =
 {
-     &AC_CMD_GetMovementParameters,
-     &AC_CMD_SetMovementParameters,
-     &AC_CMD_SetReferncePosition,
-     &AC_CMD_GetMechanicalData,
-     &AC_CMD_GetElectricalData,
-     &AC_CMD_GetMaximumPosition,
-     &AC_CMD_ResetErrorFlags,
-     &AC_CMD_SetMovmentEnableState
+    &AC_CMD_SetMovementParameters,
+    &AC_CMD_SetReferncePosition,
+    &AC_CMD_SetMovmentEnableState,
+    &AC_CMD_ResetErrorFlags,
+    &AC_CMD_GetMovementParameters,
+    &AC_CMD_GetMechanicalData,
+    &AC_CMD_GetElectricalData,
+    &AC_CMD_GetMaximumPosition
 };
 
 

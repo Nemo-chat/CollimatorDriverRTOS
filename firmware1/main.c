@@ -50,6 +50,8 @@ typedef struct
     MDA_Data_struct mda_data_s;
     AC_BTNManualControl_struct ac_btn_manual_control_s;
     MTCL_Control_struct mtcl_control_s;
+    MTCL_MovementParams_struct mtcl_movement_params_s;
+    F32 mtcl_maximum_position_rad_F32;
     boolean foc_enable_state_b;
 
 }SharedDataCPU1TOCPU2_struct;
@@ -65,7 +67,7 @@ typedef struct
 }SharedDataCPU2TOCPU1_struct;
 
 // Task handles
-TaskHandle_t ProcessInputTask, ApplicationTask, WriteToSharedMemoryTask;
+TaskHandle_t ProcessInputTask, ApplicationTask, WriteToSharedMemoryTask, ProcessOutputTask;
 
 // Execution counters
 static volatile uint32_t ctrProcessInputTask = 0;
@@ -75,6 +77,7 @@ static volatile uint32_t ctrInterruptEventIPC1_from_CPU2 = 0;
 static volatile uint32_t ctrInterruptEventIPC2_from_CPU2 = 0;
 static volatile uint32_t ctrWriteToSharedMemoryTask = 0;
 static volatile uint32_t ctrWriteToSharedMemoryTaskHit = 0;
+static volatile uint32_t ctrProcessOutputTask = 0;
 
 uint8_t ADCInterruptsNumber = 10;
 static volatile float elapsedTime = 0;
@@ -109,6 +112,7 @@ uint8_t ucHeap[ configTOTAL_HEAP_SIZE ];
 static void ProcessInputsTask_Func(void *pvParameters);
 static void ApplicationTask_Func(void *pvParameters);
 static void WriteToSharedMemoryTask_Func(void *pvParameters);
+static void ProcessOutputTask_Func(void *pvParameters);
 
 void lockCPU1(void);
 void unlockCPU1(void);
@@ -224,6 +228,16 @@ void main(void)
         ESTOP0;
     }
 
+    if(xTaskCreate(ProcessOutputTask_Func,
+                   (const char *)"ProcessOutputTask",
+                   WRITE_TO_SHARED_MEMORY_TASK_STACK_SIZE,
+                   NULL,
+                   (tskIDLE_PRIORITY + 2),
+                   &ProcessOutputTask) != pdTRUE)
+    {
+        ESTOP0;
+    }
+
     // IPC synchronization with CPU2
     while(IpcRegs.IPCSTS.bit.IPC17 == 0);
     IpcRegs.IPCACK.bit.IPC17 = 1;
@@ -250,6 +264,10 @@ static void WriteToSharedMemoryTask_Func(void *pvParameters)
         SharedDataCPU1TOCPU2.ac_btn_manual_control_s = *AC_GetBTNData_ps();  // Read updated button control data from shared memory
         SharedDataCPU1TOCPU2.foc_enable_state_b = FOC_GetEnableState();      // Update FOC enable state in shared data
         SharedDataCPU1TOCPU2.mtcl_control_s = *MTCL_GetControlState_ps();    // Update MTCL control struct in shared data
+        SharedDataCPU1TOCPU2.mtcl_maximum_position_rad_F32 = MTCL_GetMaximumPosition_F32();
+        MTCL_GetMovementParams(&SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxSpeed__rad_s__F32,
+                                    &SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxAccel__rad_s2__F32,
+                                    &SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxTorque__Nm__F32); // Update MTCL movement parameters in shared data
         // unlockCPU1();
 
         IpcRegs.IPCSET.bit.IPC3 = 1; // Generate interrupt to notify CPU2 about updated data
@@ -257,6 +275,24 @@ static void WriteToSharedMemoryTask_Func(void *pvParameters)
 
         ctrWriteToSharedMemoryTask++;
 
+    }
+}
+
+static void ProcessOutputTask_Func(void *pvParameters)
+{
+    uint32_t ulEventToProcess;
+    for(;;)
+    {
+        ulEventToProcess = ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        if (ulEventToProcess != 0)
+        {
+            /* Apply compare values from global buffer */
+            PWM_SetCompareValues(g_PWM_CompareValues.cmp_u,
+                                 g_PWM_CompareValues.cmp_v,
+                                 g_PWM_CompareValues.cmp_w);
+
+            ctrProcessOutputTask++;
+        }
     }
 }
 
@@ -309,7 +345,8 @@ static void ApplicationTask_Func(void *pvParameters)
             MTCL_MainHandler();        // Execution time is around 10 microseconds
             IpcRegs.IPCCLR.bit.IPC10 = 1;
             // elapsedTime = (float)(CpuTimer1Regs.PRD.all - CpuTimer1Regs.TIM.all) * 0.005; 
-
+            xTaskNotifyGive(ProcessOutputTask);
+            
             static uint8_t ApplicationCounter = 0;
             ApplicationCounter++;
             if (ApplicationCounter >= ADCInterruptsNumber)

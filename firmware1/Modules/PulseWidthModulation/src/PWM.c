@@ -14,8 +14,12 @@
  */
 #include <PWM_core.h>
 #include <TRAN.h>
+#include <PWM_interface.h>
 
 const static boolean s_PWM_Initialized_b = False_b;
+
+/* Global compare values filled by control code; applied by ProcessOutputTask */
+volatile PWM_CompareValues_t g_PWM_CompareValues = {0,0,0};
 
 /**
  * @brief PWM initialization function

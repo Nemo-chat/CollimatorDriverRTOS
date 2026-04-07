@@ -40,13 +40,11 @@
 
 #define MAX_MOMENT                                         ( (F32)0.1)                  /** < Threshold value of Moment for safety stop */
 
-void    FOC_CalculateOutput(const PC_Data_struct* trajectory_data_ps, const MDA_Data_struct* motor_data_ps);
+void    FOC_CalculateOutput(const PC_Data_struct* trajectory_data_ps);
 void    FOC_VoltageLimiter(TRAN_struct * const tran_values_s);
 void    FOC_CommutationAlignment();
 void    FOC_SetEnableState(boolean new_state_b);
 boolean FOC_GetEnableState(void);
 F32     FOC_GetTorque__Nm__F32(void);
-
-extern const MDA_Data_struct* s_MDA_data_ps_for_MTCL;
 
 #endif /* MODULES_FIELDORIENTEDCONTROL_INC_FOC_H_ */

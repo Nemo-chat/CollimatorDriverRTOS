@@ -232,7 +232,10 @@ boolean MTCL_TorqueExceedCheck(void)
             PC_Reset_Data(1);
             s_MTCL_Control_s.over_torque_error_f1 = 1;
             FOC_SetEnableState(False_b);
-            PWM_SetCompareValues(0,0,0);
+            /* zero compare values in global buffer; ProcessOutputTask will apply */
+            g_PWM_CompareValues.cmp_u = 0;
+            g_PWM_CompareValues.cmp_v = 0;
+            g_PWM_CompareValues.cmp_w = 0;
             s_MTCL_ReferencePosition__rad__F32 = MDA_GetData_ps()->angular_position__rad__F32;
         }
     }

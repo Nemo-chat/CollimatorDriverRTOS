@@ -74,10 +74,10 @@ void FOC_CalculateOutput(const PC_Data_struct* trajectory_data_ps)
     /* transformation from dq to abc */
     TRAN_DqToAbc(&s_trans_s);
 
-    /* Write new compare values to PWM. */
-    PWM_SetCompareValues(PWM_DUTY_TO_CMP_dMU16( (s_trans_s.abc_s.a_F32 / MDA_GetData_ps()->dc_link_voltage__V__F32) + 0.5f ),
-                         PWM_DUTY_TO_CMP_dMU16( (s_trans_s.abc_s.b_F32 / MDA_GetData_ps()->dc_link_voltage__V__F32) + 0.5f ),
-                         PWM_DUTY_TO_CMP_dMU16( (s_trans_s.abc_s.c_F32 / MDA_GetData_ps()->dc_link_voltage__V__F32) + 0.5f ));
+    /* Write new compare values into global buffer (applied by ProcessOutputTask). */
+    g_PWM_CompareValues.cmp_u = PWM_DUTY_TO_CMP_dMU16( (s_trans_s.abc_s.a_F32 / MDA_GetData_ps()->dc_link_voltage__V__F32) + 0.5f );
+    g_PWM_CompareValues.cmp_v = PWM_DUTY_TO_CMP_dMU16( (s_trans_s.abc_s.b_F32 / MDA_GetData_ps()->dc_link_voltage__V__F32) + 0.5f );
+    g_PWM_CompareValues.cmp_w = PWM_DUTY_TO_CMP_dMU16( (s_trans_s.abc_s.c_F32 / MDA_GetData_ps()->dc_link_voltage__V__F32) + 0.5f );
 }
 
 /**

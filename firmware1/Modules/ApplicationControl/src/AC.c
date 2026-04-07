@@ -297,7 +297,8 @@ static void AC_CMD_ResetErrorFlags( const void* const payload_p,
         *response_data_size_pU16 = 1;
         return;
     }
-    MTCL_ResetErrorFlags();
+    // MTCL_ResetErrorFlags();
+    AC_Reset_ErrorFlags_b = True_b;
     response_data_pU16[0] = RESPONSE_OK_e;
     *response_data_size_pU16 = 1;
 }

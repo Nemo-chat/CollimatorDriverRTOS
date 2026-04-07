@@ -36,10 +36,13 @@
 // Macro to define stack size of individual tasks
 #define COM_TASK_STACK_SIZE 1024
 #define PRINT_TASK_STACK_SIZE 256
+#define WRITE_COMMAND_TO_SHARED_MEMORY_TASK_STACK_SIZE 256
+
 
 // Macro to define priorities of individual tasks
 #define COM_TASK_PRIORITY   1
 #define PRINT_TASK_PRIORITY   1
+#define WRITE_COMMAND_TO_SHARED_MEMORY_TASK_PRIORITY   2
 
 #define STACK_SIZE  256U
 
@@ -65,13 +68,14 @@ typedef struct
 }SharedDataCPU2TOCPU1_struct;
 
 // Task handles
-TaskHandle_t CommunicationTask, PrintTask, ReadFromSharedMemoryTask;
+TaskHandle_t CommunicationTask, PrintTask, WriteCommandToSharedMemoryTask;
 
 // Execution counters
 static volatile uint32_t ctrCommunicationTask = 0;
 static volatile uint32_t ctrPrintTask = 0;
 static volatile uint32_t ctrInterruptEventIPC_from_CPU1 = 0;
-static volatile uint32_t ctrReadFromSharedMemoryTask = 0;
+static volatile uint32_t ctrWriteCommandToSharedMemoryTask = 0;
+static volatile uint32_t ctrReadDataFromSharedMemoryISR = 0;
 
 boolean should_update_shared_data_b = False_b;
 
@@ -101,7 +105,8 @@ uint8_t ucHeap[ configTOTAL_HEAP_SIZE ];
 // Function prototypes
 static void CommunicationTask_Func(void *pvParameters);
 static void PrintTask_Func(void *pvParameters);
-static void ReadFromSharedMemoryTask_Func(void *pvParameters);
+static void WriteCommandToSharedMemoryTask_Func(void *pvParameters);
+
 void lockCPU2(void);
 void unlockCPU2(void);
 void setDataToCPU1(AC_CommandIndex_enum);
@@ -157,6 +162,16 @@ void main(void)
         ESTOP0;
     }
 
+    if(xTaskCreate(WriteCommandToSharedMemoryTask_Func, 
+                   (const char *)"WriteCommandToSharedMemoryTask", 
+                   WRITE_COMMAND_TO_SHARED_MEMORY_TASK_STACK_SIZE, 
+                   NULL,
+                   (tskIDLE_PRIORITY + WRITE_COMMAND_TO_SHARED_MEMORY_TASK_PRIORITY), 
+                   &WriteCommandToSharedMemoryTask) != pdTRUE)
+    {
+        ESTOP0;
+    }
+
     // IPC synchronization with CPU1 
     IpcRegs.IPCSET.bit.IPC17 = 1;
     while(IpcRegs.IPCFLG.bit.IPC17 != 0);
@@ -184,12 +199,14 @@ static void CommunicationTask_Func(void *pvParameters)
         
         ECOM_MainHandler();        
 
-        AC_CommandIndex_enum received_cmd = AC_GetLastReceivedCommand();
-        
-        setDataToCPU1(received_cmd);
-
+        if (AC_GetLastReceivedCommand() < AC_CMD_GET_MOVEMENT_PARAMS_e)
+        {
+            xTaskNotifyGive(WriteCommandToSharedMemoryTask);   
+        }
+                
         /* Reset command marker for next cycle */
         AC_ClearLastReceivedCommand();
+        
 
         // Increment the execution counter
         ctrCommunicationTask++;
@@ -218,6 +235,19 @@ static void PrintTask_Func(void *pvParameters)
 
         CpuTimer1Regs.TCR.bit.TRB = 1;
         vTaskDelayUntil( &xLastWakeTime, pdMS_TO_TICKS( 100 ) );
+    }
+}
+
+static void WriteCommandToSharedMemoryTask_Func(void *pvParameters)
+{
+    for(;;)
+    {
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY); // Wait until notified by Communication Task about new command to write to shared memory
+
+        setDataToCPU1(AC_GetLastReceivedCommand()); // Write the command and relevant data to shared memory for CPU2 to read
+
+        // Increment the execution counter
+        ctrWriteCommandToSharedMemoryTask++;
     }
 }
 
@@ -282,7 +312,7 @@ __interrupt void ipc3_isr_cpu1(void)
     // Clear the IPC interrupt flag
     IpcRegs.IPCACK.bit.IPC3 = 1;                // Clear the IPC3 interrupt flag
     PieCtrlRegs.PIEACK.bit.ACK1 = 1;			// Must acknowledge the PIE group
-    ctrReadFromSharedMemoryTask++;
+    ctrReadDataFromSharedMemoryISR++;
     portYIELD_FROM_ISR(pdTRUE);
 }
 
@@ -292,7 +322,7 @@ __interrupt void ipc_isr_cpu1(void)
     
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     // Notify the Communication Task that new data is available from CPU1
-    vTaskNotifyGiveFromISR(ReadFromSharedMemoryTask, &xHigherPriorityTaskWoken);
+    //vTaskNotifyGiveFromISR(ReadFromSharedMemoryTask, &xHigherPriorityTaskWoken);
 
     // Clear the IPC interrupt flag
     IpcRegs.IPCCLR.bit.IPC1 = 1;                // Clear the IPC1 interrupt flag

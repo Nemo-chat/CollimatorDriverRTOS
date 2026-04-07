@@ -25,7 +25,6 @@ U16 i = 0;
 MTCL_Control_struct s_MTCL_Control_s           = {0,0,0,1,0,0};                                                        /**< Motor control struct. */
 MTCL_TorqueCheck_struct s_Torque_check_s       = {0};                                                                  /**< Motor torque error check struct. */
 PC_Data_struct s_PC_data_s                     = {0};                                                                  /**< Motor trajectory data struct. */
-// const MDA_Data_struct * s_MDA_data_ps_for_MTCL = NULL;                                                                 /**< Pointer to motor data acquisition data struct. */
 
 F32 s_MTCL_ReferencePosition__rad__F32      = 0.0f;                                                                 /**< User requested position. */
 F32 s_MTCL_MaxSpeed__rad_s__F32             = DEFAULT_RUN_SPEED__rad_s__dF32;                                       /**< Current value of maximum speed. */
@@ -39,17 +38,15 @@ F32 prev_request_pos__F32__                 = 0.0f;                             
  * @brief Main handling function for motor control
  * @details Manages trajectory calculation and FOC requests.
  */
-void MTCL_MainHandler(const MDA_Data_struct* mda_data_ps)
+void MTCL_MainHandler()
 {
     F32 reference_position__rad__F32 = s_MTCL_ReferencePosition__rad__F32;
-    // Update pointer to motor data acquisition data struct.
-    s_MDA_data_ps_for_MTCL = mda_data_ps;
 
     if (FOC_GetEnableState())
     {
         MTCL_CalculateTrajectory(reference_position__rad__F32, s_MTCL_MaxSpeed__rad_s__F32, s_MTCL_MaxAccel__rad_s2__F32);
         PWM_SetOutputEnable(True_b);
-        FOC_CalculateOutput(&s_PC_data_s, s_MDA_data_ps_for_MTCL);
+        FOC_CalculateOutput(&s_PC_data_s);
         MTCL_TorqueExceedCheck();
     }
 }
@@ -96,18 +93,18 @@ static void MTCL_CalculateTrajectory(F32 Requested_Position__rad__F32, F32 MaxMe
         {
             s_PC_data_s.ticks_enabled = 1;
             prev_request_pos__F32__= Requested_Position__rad__F32;
-            s_PC_data_s.Start_Absolute_Position__rad__F32 = s_MDA_data_ps_for_MTCL->angular_position__rad__F32;
+            s_PC_data_s.Start_Absolute_Position__rad__F32 = MDA_GetData_ps()->angular_position__rad__F32;
             s_PC_data_s.tj.Position__rad__F32 = 0.0f; //new line
 
-                if(Requested_Position__rad__F32 > s_MDA_data_ps_for_MTCL->angular_position__rad__F32)
+                if(Requested_Position__rad__F32 > MDA_GetData_ps()->angular_position__rad__F32)
                 {
-                    DeltaMdlPosition__rad__F32 = (Requested_Position__rad__F32 - s_MDA_data_ps_for_MTCL->angular_position__rad__F32) - 2.0f * DELTA_ACCELERATION_POSITION__rad__df32(MaxAcc_rad_s2_F32,ACCELERATOIN_TIME__s__df32(MaxMechSpeed_rad_s1_F32,MaxAcc_rad_s2_F32));
+                    DeltaMdlPosition__rad__F32 = (Requested_Position__rad__F32 - MDA_GetData_ps()->angular_position__rad__F32) - 2.0f * DELTA_ACCELERATION_POSITION__rad__df32(MaxAcc_rad_s2_F32,ACCELERATOIN_TIME__s__df32(MaxMechSpeed_rad_s1_F32,MaxAcc_rad_s2_F32));
                     DeltaMdlTime__s__F32 = DeltaMdlPosition__rad__F32 / MaxMechSpeed_rad_s1_F32;
                     Minus_Check = 1;
                 }
                 else
                 {
-                    DeltaMdlPosition__rad__F32 = (Requested_Position__rad__F32 - s_MDA_data_ps_for_MTCL->angular_position__rad__F32) + 2.0f * DELTA_ACCELERATION_POSITION__rad__df32(MaxAcc_rad_s2_F32,ACCELERATOIN_TIME__s__df32(MaxMechSpeed_rad_s1_F32,MaxAcc_rad_s2_F32));
+                    DeltaMdlPosition__rad__F32 = (Requested_Position__rad__F32 - MDA_GetData_ps()->angular_position__rad__F32) + 2.0f * DELTA_ACCELERATION_POSITION__rad__df32(MaxAcc_rad_s2_F32,ACCELERATOIN_TIME__s__df32(MaxMechSpeed_rad_s1_F32,MaxAcc_rad_s2_F32));
                     DeltaMdlTime__s__F32 = -DeltaMdlPosition__rad__F32 / MaxMechSpeed_rad_s1_F32;
                     Minus_Check = -1;
                 }
@@ -121,7 +118,7 @@ static void MTCL_CalculateTrajectory(F32 Requested_Position__rad__F32, F32 MaxMe
         else
         {
             roof = True_b;
-            FullTime__s__F32 = 2.0f*FM_sqrt_F32((Minus_Check*(Requested_Position__rad__F32 - s_MDA_data_ps_for_MTCL->angular_position__rad__F32))/MaxAcc_rad_s2_F32);
+            FullTime__s__F32 = 2.0f*FM_sqrt_F32((Minus_Check*(Requested_Position__rad__F32 - MDA_GetData_ps()->angular_position__rad__F32))/MaxAcc_rad_s2_F32);
         }
     }
     /*new lines*/
@@ -235,8 +232,11 @@ boolean MTCL_TorqueExceedCheck(void)
             PC_Reset_Data(1);
             s_MTCL_Control_s.over_torque_error_f1 = 1;
             FOC_SetEnableState(False_b);
-            PWM_SetCompareValues(0,0,0);
-            s_MTCL_ReferencePosition__rad__F32 = s_MDA_data_ps_for_MTCL->angular_position__rad__F32;
+            /* zero compare values in global buffer; ProcessOutputTask will apply */
+            g_PWM_CompareValues.cmp_u = 0;
+            g_PWM_CompareValues.cmp_v = 0;
+            g_PWM_CompareValues.cmp_w = 0;
+            s_MTCL_ReferencePosition__rad__F32 = MDA_GetData_ps()->angular_position__rad__F32;
         }
     }
     return True_b;
