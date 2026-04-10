@@ -196,6 +196,7 @@ static void CommunicationTask_Func(void *pvParameters)
     
     for(;;)
     {
+        // TrackGPIO_Set(CommunicationTaskTrack);
         
         ECOM_MainHandler();        
 
@@ -210,6 +211,7 @@ static void CommunicationTask_Func(void *pvParameters)
 
         // Increment the execution counter
         ctrCommunicationTask++;
+        // TrackGPIO_Clear(CommunicationTaskTrack);
         vTaskDelayUntil( &xLastWakeTime, pdMS_TO_TICKS( 10 ) );
     }
 }
@@ -224,8 +226,8 @@ static void PrintTask_Func(void *pvParameters)
 
     for(;;)
     {
-        elapsedTime = (float)(CpuTimer1Regs.PRD.all - CpuTimer1Regs.TIM.all) * 0.005; // Calculate elapsed time in seconds (assuming 200 MHz timer clock)
-
+        // TrackGPIO_Set(PrintTaskTrack);
+        elapsedTime = (float)(CpuTimer1Regs.PRD.all - CpuTimer1Regs.TIM.all) * 0.005; 
         DisplayRefresh(MDA_GetData_ps()->angular_position__rad__F32, 
                         MTCL_GetControlState_ps()->over_torque_error_f1, 
                         FOC_GetEnableState());
@@ -234,6 +236,7 @@ static void PrintTask_Func(void *pvParameters)
         ctrPrintTask++;
 
         CpuTimer1Regs.TCR.bit.TRB = 1;
+        // TrackGPIO_Clear(PrintTaskTrack);
         vTaskDelayUntil( &xLastWakeTime, pdMS_TO_TICKS( 100 ) );
     }
 }
@@ -243,11 +246,12 @@ static void WriteCommandToSharedMemoryTask_Func(void *pvParameters)
     for(;;)
     {
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY); // Wait until notified by Communication Task about new command to write to shared memory
-
+        // TrackGPIO_Set(WriteCommandToSharedMemoryTaskTrack);
         setDataToCPU1(AC_GetLastReceivedCommand()); // Write the command and relevant data to shared memory for CPU2 to read
 
         // Increment the execution counter
         ctrWriteCommandToSharedMemoryTask++;
+        // TrackGPIO_Clear(WriteCommandToSharedMemoryTaskTrack);
     }
 }
 
@@ -295,6 +299,7 @@ void setDataToCPU1(AC_CommandIndex_enum received_cmd)
 
 __interrupt void ipc3_isr_cpu1(void)
 {
+    // TrackGPIO_Set(ISR_IPC_CPU1);
     MDA_SetData(&SharedDataCPU1TOCPU2.mda_data_s);         // Update MDA data in shared structure
     MTCL_SetMovementParams(SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxSpeed__rad_s__F32,
                             SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxAccel__rad_s2__F32,
@@ -313,6 +318,8 @@ __interrupt void ipc3_isr_cpu1(void)
     IpcRegs.IPCACK.bit.IPC3 = 1;                // Clear the IPC3 interrupt flag
     PieCtrlRegs.PIEACK.bit.ACK1 = 1;			// Must acknowledge the PIE group
     ctrReadDataFromSharedMemoryISR++;
+    
+    // TrackGPIO_Clear(ISR_IPC_CPU1);
     portYIELD_FROM_ISR(pdTRUE);
 }
 

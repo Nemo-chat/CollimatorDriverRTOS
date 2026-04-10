@@ -35,6 +35,8 @@ void PWM_Init(void)
 
     PWM_InitGpioPins();
     EALLOW;                                                     /* Enable writing protected registers. */
+    
+    ClkCfgRegs.PERCLKDIVSEL.bit.EPWMCLKDIV = 0;
     /* Enable clocks for timers. */
     CpuSysRegs.PCLKCR2.bit.EPWM3        = (U16)1;               /* Enable clocking of EPWM3 module. */
     CpuSysRegs.PCLKCR2.bit.EPWM6        = (U16)1;               /* Enable clocking of EPWM6 module. */
@@ -76,8 +78,8 @@ void PWM_Init(void)
     EPwm3Regs.ETSEL.bit.SOCBEN          = (U16)1;              /* Enable start of conversion pulse. */
     EPwm3Regs.ETSEL.bit.SOCBSEL         = (U16)2;              /* Start of conversion pulse on counter max value. */
     EPwm3Regs.ETPS.bit.SOCPSSEL         = (U16)1;              
-    EPwm3Regs.ETSOCPS.bit.SOCAPRD2      = (U16)10;
-    EPwm3Regs.ETSOCPS.bit.SOCBPRD2      = (U16)10; 
+    EPwm3Regs.ETSOCPS.bit.SOCAPRD2      = (U16)1;
+    EPwm3Regs.ETSOCPS.bit.SOCBPRD2      = (U16)1; 
 
     CpuSysRegs.PCLKCR0.bit.TBCLKSYNC    = (U16)1;               /* Sync PWM clocks */
     EDIS;                                                       /* Disable writing to protected registers. */

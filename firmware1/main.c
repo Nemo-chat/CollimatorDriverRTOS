@@ -34,13 +34,14 @@
 #include "FreeRTOSConfig.h"
 
 // Macro to define stack size of individual tasks
-#define PROCESS_INPUT_TASK_STACK_SIZE 1024
+#define PROCESS_INPUT_TASK_STACK_SIZE 256
 #define APPLICATION_TASK_STACK_SIZE 256
-# define WRITE_TO_SHARED_MEMORY_TASK_STACK_SIZE 256
+#define WRITE_TO_SHARED_MEMORY_TASK_STACK_SIZE 256
 
 // Macro to define priorities of individual tasks
-#define PROCESS_INPUT_TASK_PRIORITY   1
-#define APPLICATION_TASK_PRIORITY   1
+#define PROCESS_INPUT_TASK_PRIORITY            2
+#define APPLICATION_TASK_PRIORITY              1
+#define PROCESS_OUTPUT_TASK_PRIORITY           1
 #define WRITE_TO_SHARED_MEMORY_TASK_PRIORITY   1
 
 #define STACK_SIZE  256U
@@ -140,7 +141,10 @@ void vApplicationStackOverflowHook( TaskHandle_t xTask, char *pcTaskName )
 interrupt void MDA_AdcConverstionCompleteIsr(void)
 {
     // ISR_MotorControlHandler();
-    
+    GpioDataRegs.GPASET.bit.GPIO25 = 1;
+
+    // elapsedTime = (float)(CpuTimer1Regs.PRD.all - CpuTimer1Regs.TIM.all) * 0.005; 
+
     ctrInterruptEvent++;
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     xSemaphoreGiveFromISR(SyncSemaphore, &xHigherPriorityTaskWoken);
@@ -148,9 +152,14 @@ interrupt void MDA_AdcConverstionCompleteIsr(void)
     AdcaRegs.ADCINTFLGCLR.bit.ADCINT1   = (U16)1;                                   /* Clear interrupt flag. */
     PieCtrlRegs.PIEACK.bit.ACK1         = (U16)1;
     
+    // CpuTimer1Regs.TCR.bit.TRB = 1;
+
+    GpioDataRegs.GPACLEAR.bit.GPIO25 = 1;
+
     if (xHigherPriorityTaskWoken == pdTRUE)
     {
         portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+
     }
 
 }
@@ -179,6 +188,7 @@ void main(void)
     TEST_PinInit();
     MDA_CalibratePhaseCurrentsOffsets();
     AC_ManualControlInit();
+    TrackGPIOsInit();
 
     // Configure the shared memory GS11 and GS15 to be accessible by CPU2
     EALLOW;
@@ -232,7 +242,7 @@ void main(void)
                    (const char *)"ProcessOutputTask",
                    WRITE_TO_SHARED_MEMORY_TASK_STACK_SIZE,
                    NULL,
-                   (tskIDLE_PRIORITY + 2),
+                   (tskIDLE_PRIORITY + PROCESS_OUTPUT_TASK_PRIORITY),
                    &ProcessOutputTask) != pdTRUE)
     {
         ESTOP0;
@@ -259,6 +269,7 @@ static void WriteToSharedMemoryTask_Func(void *pvParameters)
     {
         ctrWriteToSharedMemoryTaskHit++;
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
         // lockCPU1();
         SharedDataCPU1TOCPU2.mda_data_s = *MDA_GetData_ps();                 // Read updated data from shared memory
         SharedDataCPU1TOCPU2.ac_btn_manual_control_s = *AC_GetBTNData_ps();  // Read updated button control data from shared memory
@@ -272,8 +283,13 @@ static void WriteToSharedMemoryTask_Func(void *pvParameters)
 
         IpcRegs.IPCSET.bit.IPC3 = 1; // Generate interrupt to notify CPU2 about updated data
         while(IpcRegs.IPCSTS.bit.IPC3 != 0); // Wait for CPU2 to acknowledge the update
-
+        
+        vTaskPrioritySet(ProcessInputTask, 2);
+        vTaskPrioritySet(ApplicationTask, 1);
+        vTaskPrioritySet(ProcessOutputTask, 1);
+        vTaskPrioritySet(NULL,  1);
         ctrWriteToSharedMemoryTask++;
+
 
     }
 }
@@ -285,13 +301,18 @@ static void ProcessOutputTask_Func(void *pvParameters)
     {
         ulEventToProcess = ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
         if (ulEventToProcess != 0)
-        {
+        {   
+            GpioDataRegs.GPASET.bit.GPIO6 = 1;
             /* Apply compare values from global buffer */
             PWM_SetCompareValues(g_PWM_CompareValues.cmp_u,
                                  g_PWM_CompareValues.cmp_v,
                                  g_PWM_CompareValues.cmp_w);
 
             ctrProcessOutputTask++;
+            GpioDataRegs.GPACLEAR.bit.GPIO6 = 1;
+            UBaseType_t uxPriority = uxTaskPriorityGet(NULL);        
+            vTaskPrioritySet(WriteToSharedMemoryTask,  uxPriority + 1); 
+            taskYIELD();
         }
     }
 }
@@ -305,6 +326,7 @@ static void ProcessInputsTask_Func(void *pvParameters)
     {
         // Wait for the semaphore to be given by the ADC ISR
         xSemaphoreTake(SyncSemaphore, portMAX_DELAY);
+        GpioDataRegs.GPASET.bit.GPIO26 = 1;
         
         ATB_IncrementTime();          
         // Process the inputs and update the data structure with newly 
@@ -312,10 +334,13 @@ static void ProcessInputsTask_Func(void *pvParameters)
         MDA_UpdateData();             // Execution time is around 4.7 microseconds
         AC_ManualControlHandler(); 
 
-        xTaskNotifyGive(ApplicationTask); // Notify the Application Task that new data is available
-
         // Increment the execution counter
         ctrProcessInputTask++;
+        GpioDataRegs.GPACLEAR.bit.GPIO26 = 1;
+        UBaseType_t uxPriority = uxTaskPriorityGet(NULL);        
+        vTaskPrioritySet(ApplicationTask,  uxPriority + 1); 
+        xTaskNotifyGive(ApplicationTask); // Notify the Application Task that new data is available
+        taskYIELD(); // Yield to allow Application Task to run immediately after processing inputs
 
     }
 }
@@ -333,6 +358,7 @@ static void ApplicationTask_Func(void *pvParameters)
         ulEventToProcess = ulTaskNotifyTake( pdTRUE, portMAX_DELAY );
         if (ulEventToProcess != 0)
         {   
+            GpioDataRegs.GPASET.bit.GPIO27 = 1;
             // Set reference position from button control if any button is pressed
             if (AC_GetBTNData_ps()->any_button_pressed_b)
             {
@@ -345,18 +371,31 @@ static void ApplicationTask_Func(void *pvParameters)
             MTCL_MainHandler();        // Execution time is around 10 microseconds
             IpcRegs.IPCCLR.bit.IPC10 = 1;
             // elapsedTime = (float)(CpuTimer1Regs.PRD.all - CpuTimer1Regs.TIM.all) * 0.005; 
+            
+            // GpioDataRegs.GPACLEAR.bit.GPIO27 = 1;
             xTaskNotifyGive(ProcessOutputTask);
+            // vTaskPrioritySet(ProcessOutputTask, 3);  
+            // GpioDataRegs.GPASET.bit.GPIO27 = 1;
+
             
             static uint8_t ApplicationCounter = 0;
             ApplicationCounter++;
             if (ApplicationCounter >= ADCInterruptsNumber)
             {
                 ApplicationCounter = 0;
+                // GpioDataRegs.GPACLEAR.bit.GPIO27 = 1;
                 xTaskNotifyGive(WriteToSharedMemoryTask);
+                // GpioDataRegs.GPASET.bit.GPIO27 = 1;
+                
             }
-
+            
             // Increment the execution counter
             ctrApplicationTask++;
+            GpioDataRegs.GPACLEAR.bit.GPIO27 = 1;
+            UBaseType_t uxPriority = uxTaskPriorityGet(NULL);        
+            vTaskPrioritySet(ProcessOutputTask,  uxPriority + 1); 
+     
+            taskYIELD();
         }
     }
 }
@@ -393,11 +432,14 @@ void getDataFromCPU2(void)
 __interrupt void ipc2_isr_cpu2(void)
 {
     ctrInterruptEventIPC2_from_CPU2++;
+    // TrackGPIO_Set(ISR_IPC_CPU2);
 
     getDataFromCPU2(); // Read the command and data sent by CPU2 and update control parameters accordingly
     // Clear the IPC interrupt flag
     IpcRegs.IPCACK.bit.IPC2 = 1;                // Clear the IPC2 interrupt flag
     PieCtrlRegs.PIEACK.bit.ACK1 = 1;			// Must acknowledge the PIE group
+
+    // TrackGPIO_Clear(ISR_IPC_CPU2);
 
     portYIELD_FROM_ISR(pdTRUE);
 
