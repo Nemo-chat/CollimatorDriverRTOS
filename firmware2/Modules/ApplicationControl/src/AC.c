@@ -40,13 +40,13 @@ void AC_ClearLastReceivedCommand(void)
 void AC_ManualControlInit(void)
 {
     EALLOW;
-    /* GPIO69 - Button1 */
-    GpioCtrlRegs.GPCDIR.bit.GPIO69 = 0;     /* Pin as input. */
-    GpioCtrlRegs.GPCPUD.bit.GPIO69 = 0;     /* Enable internal pull up. */
+    /* SB2 - Button1 */
+    GpioCtrlRegs.GPBDIR.bit.GPIO40 = 0;     /* Pin as input. */
+    GpioCtrlRegs.GPBPUD.bit.GPIO40 = 0;     /* Enable internal pull up. */
 
-    /* GPIO70 - Button2 */
-    GpioCtrlRegs.GPCDIR.bit.GPIO70 = 0;     /* Pin as input. */
-    GpioCtrlRegs.GPCPUD.bit.GPIO70 = 0;     /* Enable internal pull up. */
+    /* SB3 - Button2 */
+    GpioCtrlRegs.GPBDIR.bit.GPIO41 = 0;     /* Pin as input. */
+    GpioCtrlRegs.GPBPUD.bit.GPIO41 = 0;     /* Enable internal pull up. */
     EDIS;
 }
 

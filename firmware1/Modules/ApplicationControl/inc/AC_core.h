@@ -19,8 +19,8 @@
 
 #define AC_CORE_CHECK_INDEX_BOUND_dM_b(idx)   ( idx < (sizeof(AC_Functions) / sizeof(AC_ControlFunction_pF)) )
 
-#define AC_BTN1_PRESSED_db          ( (boolean)!GpioDataRegs.GPCDAT.bit.GPIO70 )    /**< Check if button 1 is pressed. */
-#define AC_BTN2_PRESSED_db          ( (boolean)!GpioDataRegs.GPCDAT.bit.GPIO69 )    /**< Check if button 1 is pressed. */
+#define AC_BTN1_PRESSED_db          ( (boolean)!GpioDataRegs.GPBDAT.bit.GPIO40 )    /**< Check if button 1 is pressed. */
+#define AC_BTN2_PRESSED_db          ( (boolean)!GpioDataRegs.GPBDAT.bit.GPIO41 )    /**< Check if button 1 is pressed. */
 
 /* Button debouncing structure. */
 typedef struct

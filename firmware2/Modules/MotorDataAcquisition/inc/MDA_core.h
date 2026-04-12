@@ -32,10 +32,10 @@
 #define MDA_DC_LINK_VOLTAGE_FROM_ADC_VAL_dMF32(adc_val) ( MDA_ADC_VALUE_TO_VOLTS__V__dMF32(adc_val) / MDA_DC_LINK_VOLTAGE_SENSITIVITY_dF32 )
 
 /* ADC conversion results registers. */
-#define MDA_ADC_U_CURRENT_CONV_RES_d                    ( AdcaResultRegs.ADCRESULT1 )
+#define MDA_ADC_U_CURRENT_CONV_RES_d                    ( AdcaResultRegs.ADCRESULT0 )
 #define MDA_ADC_V_CURRENT_CONV_RES_d                    ( AdcbResultRegs.ADCRESULT0 )
-#define MDA_ADC_W_CURRENT_CONV_RES_d                    ( AdcaResultRegs.ADCRESULT0 )
-#define MDA_ADC_DC_LINK_CONV_RES_d                      ( AdcbResultRegs.ADCRESULT1 )
+#define MDA_ADC_W_CURRENT_CONV_RES_d                    ( AdccResultRegs.ADCRESULT0 )
+#define MDA_ADC_DC_LINK_CONV_RES_d                      ( AdcdResultRegs.ADCRESULT1 )
 
 #define MDA_ENC_TIME_BETWEEN_PULSES__s__dMF32(count)    ( (F32)count / (F32)100.0E6 )
 

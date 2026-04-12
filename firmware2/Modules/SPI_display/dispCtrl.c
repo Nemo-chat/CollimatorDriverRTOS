@@ -70,19 +70,16 @@ void dispCtrl_vInitDisplay(void){
     DELAY_US(7000);
     /* set RESET pin for display*/
 
-    GpioCtrlRegs.GPCGMUX1.bit.GPIO72 = 1;
-    GpioCtrlRegs.GPCGMUX1.bit.GPIO72 = 0;
-    GpioCtrlRegs.GPCDIR.bit.GPIO72 = 1;
-    GpioDataRegs.GPCCLEAR.bit.GPIO72 = 1;
+    // GpioCtrlRegs.GPCGMUX1.bit.GPIO72 = 1;
+    // GpioCtrlRegs.GPCGMUX1.bit.GPIO72 = 0;
+    // GpioCtrlRegs.GPCDIR.bit.GPIO72 = 1;
+    // GpioDataRegs.GPCCLEAR.bit.GPIO72 = 1;
 
-    GpioCtrlRegs.GPAGMUX2.bit.GPIO30 = 1;
-    GpioCtrlRegs.GPAGMUX2.bit.GPIO30 = 0;
-    GpioCtrlRegs.GPADIR.bit.GPIO30 = 1;
-    GpioDataRegs.GPACLEAR.bit.GPIO30 = 1;
-    GpioDataRegs.GPASET.bit.GPIO30 = 1;
+    GpioDataRegs.GPACLEAR.bit.GPIO24 = 1;
+    GpioDataRegs.GPASET.bit.GPIO24 = 1;
 
     DELAY_US(12000);
-    GpioDataRegs.GPACLEAR.bit.GPIO30 = 1;
+    GpioDataRegs.GPACLEAR.bit.GPIO24 = 1;
     DELAY_US(2000);
 
     //spi_vSendChar( (0xF8 ^ ( (char)0 << 2 ) ^ ( (char)0 << 1) ) ); /*start byte - 5 high,RW,RS*/
@@ -219,9 +216,9 @@ void float_to_char_array(F32 f, char* buffer, U16 precision) {
  * @brief Refresh display according with motor state.
  * @details Executed in the main loop of the code.
  */
-void DisplayRefresh(F32 AngularPosition_rad_F32, U16 OverTorqueError_f1, boolean FOCEnableState_b)
+void DisplayRefresh(void)
 {
-    if(OverTorqueError_f1 == 1)
+    if(s_MTCL_Control_s.over_torque_error_f1 == 1)
     {
         dispCtrl_vSetPosition(1,2);
         dispCtrl_u16PutString("     ERROR:     ");
@@ -232,10 +229,10 @@ void DisplayRefresh(F32 AngularPosition_rad_F32, U16 OverTorqueError_f1, boolean
         StartApplicantionState = False_b;
     }
 
-    if(FOCEnableState_b)
+    if(FOC_GetEnableState())
     {
         dispCtrl_vSetPosition(1,3);
-        float_to_char_array( ceiling_F32(( (AngularPosition_rad_F32 / 0.058448f) )), &buffer, 1);
+        float_to_char_array( ceiling_F32(( (MDA_GetData_ps()->angular_position__rad__F32 / 0.058448f) )), &buffer, 1);
         dispCtrl_u16PutString(&buffer);
         dispCtrl_u16PutString(" mm   ");
         dispCtrl_vSetPosition(14,3);
@@ -245,14 +242,14 @@ void DisplayRefresh(F32 AngularPosition_rad_F32, U16 OverTorqueError_f1, boolean
     else
     {
         dispCtrl_vSetPosition(1,3);
-        float_to_char_array( ceiling_F32(( (AngularPosition_rad_F32 / 0.058448f) )), &buffer, 1);
+        float_to_char_array( ceiling_F32(( (MDA_GetData_ps()->angular_position__rad__F32 / 0.058448f) )), &buffer, 1);
         dispCtrl_u16PutString(&buffer);
         dispCtrl_u16PutString(" mm   ");
         dispCtrl_vSetPosition(14,3);
         dispCtrl_u16PutString("OFF");
     }
 
-    if(!StartApplicantionState && OverTorqueError_f1 == 0){
+    if(!StartApplicantionState && s_MTCL_Control_s.over_torque_error_f1 == 0){
             dispCtrl_vSetPosition(1,1);
             dispCtrl_u16PutString("Collimator Blade");
             dispCtrl_vSetPosition(1,2);

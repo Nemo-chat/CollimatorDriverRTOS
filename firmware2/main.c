@@ -212,7 +212,7 @@ static void CommunicationTask_Func(void *pvParameters)
         // Increment the execution counter
         ctrCommunicationTask++;
         // TrackGPIO_Clear(CommunicationTaskTrack);
-        vTaskDelayUntil( &xLastWakeTime, pdMS_TO_TICKS( 10 ) );
+        vTaskDelayUntil( &xLastWakeTime, pdMS_TO_TICKS( 1 ) );
     }
 }
 
@@ -228,9 +228,7 @@ static void PrintTask_Func(void *pvParameters)
     {
         // TrackGPIO_Set(PrintTaskTrack);
         elapsedTime = (float)(CpuTimer1Regs.PRD.all - CpuTimer1Regs.TIM.all) * 0.005; 
-        DisplayRefresh(MDA_GetData_ps()->angular_position__rad__F32, 
-                        MTCL_GetControlState_ps()->over_torque_error_f1, 
-                        FOC_GetEnableState());
+        DisplayRefresh();
         
         // Increment the execution counter
         ctrPrintTask++;

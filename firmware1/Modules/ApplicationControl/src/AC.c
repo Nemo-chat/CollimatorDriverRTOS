@@ -24,6 +24,9 @@ AC_BTNManualControl_struct s_AC_BTNManualControl_s = {False_b, 0.0f};    /**< Bu
 AC_CommandIndex_enum AC_LastReceivedCommand_e = AC_CMD_NONE_e;                          /**< Last received command index. */
 boolean AC_Reset_ErrorFlags_b = False_b;                                                        /**< Flag for resetting error flags in motor control module. */
 
+U16 AC_BTN1_PRESSED_b = 0;                                                            /**< Button 1 pressed flag. */
+U16 AC_BTN2_PRESSED_b = 0;                                                            /**< Button 2 pressed flag.8 */
+
 AC_CommandIndex_enum AC_GetLastReceivedCommand(void)
 {
     return AC_LastReceivedCommand_e;
@@ -40,13 +43,13 @@ void AC_ClearLastReceivedCommand(void)
 void AC_ManualControlInit(void)
 {
     EALLOW;
-    /* GPIO69 - Button1 */
-    GpioCtrlRegs.GPCDIR.bit.GPIO69 = 0;     /* Pin as input. */
-    GpioCtrlRegs.GPCPUD.bit.GPIO69 = 0;     /* Enable internal pull up. */
+    /* SB2 - Button1 */
+    GpioCtrlRegs.GPBDIR.bit.GPIO40 = 0;     /* Pin as input. */
+    GpioCtrlRegs.GPBPUD.bit.GPIO40 = 0;     /* Enable internal pull up. */
 
-    /* GPIO70 - Button2 */
-    GpioCtrlRegs.GPCDIR.bit.GPIO70 = 0;     /* Pin as input. */
-    GpioCtrlRegs.GPCPUD.bit.GPIO70 = 0;     /* Enable internal pull up. */
+    /* SB3 - Button2 */
+    GpioCtrlRegs.GPBDIR.bit.GPIO41 = 0;     /* Pin as input. */
+    GpioCtrlRegs.GPBPUD.bit.GPIO41 = 0;     /* Enable internal pull up. */
     EDIS;
 }
 
@@ -74,16 +77,18 @@ U16 AC_BtnDebounce_U16(AC_BtnDebounce_struct* debounce_ps, boolean current_state
         if(debounce_ps->debounced_state_b == False_b)
         {
             debounce_ps->debounced_state_b = True_b;
-            return_state_U16 = DEBOUNCE_RISING_EDGE_e;
+            debounce_ps->falling_edge_ticks_U32 = 0; // Reset falling edge ticks to avoid false detection when button is held down
         }
+        return_state_U16 = DEBOUNCE_RISING_EDGE_e;
     }
     else if(!current_state_b && ATB_CheckTicksPassed_U16(debounce_ps->falling_edge_ticks_U32, ATB_MS_TO_TICKS_dM_U32(50)))
     {
         if(debounce_ps->debounced_state_b == True_b)
         {
             debounce_ps->debounced_state_b = False_b;
-            return_state_U16 = DEBOUNCE_FALLING_EDGE_e;
+            debounce_ps->rising_edge_ticks_U32 = 0; // Reset rising edge ticks to avoid false detection when button is held down
         }
+        return_state_U16 = DEBOUNCE_FALLING_EDGE_e;
     }
     debounce_ps->last_state_b = current_state_b;
 
@@ -92,29 +97,32 @@ U16 AC_BtnDebounce_U16(AC_BtnDebounce_struct* debounce_ps, boolean current_state
 
 void AC_ManualControlHandler(void)
 {
-    boolean AC_BTN1_PRESSED_b = (AC_BtnDebounce_U16(&AC_Btn1Debounce_s, AC_BTN1_PRESSED_db) == DEBOUNCE_RISING_EDGE_e);
-    boolean AC_BTN2_PRESSED_b = (AC_BtnDebounce_U16(&AC_Btn2Debounce_s, AC_BTN2_PRESSED_db) == DEBOUNCE_RISING_EDGE_e);
+    // AC_BTN1_PRESSED_b = (AC_BtnDebounce_U16(&AC_Btn1Debounce_s, AC_BTN1_PRESSED_db));
+    // AC_BTN2_PRESSED_b = (AC_BtnDebounce_U16(&AC_Btn2Debounce_s, AC_BTN2_PRESSED_db));
 
     /* No action if both pressed or both not pressed */
-    if (AC_BTN1_PRESSED_b == AC_BTN2_PRESSED_b)
+    // if (AC_BTN1_PRESSED_b == AC_BTN2_PRESSED_b)
+    // {
+    //     s_AC_BTNManualControl_s.any_button_pressed_b = False_b;
+    // }
+    
+    if (AC_BtnDebounce_U16(&AC_Btn1Debounce_s, AC_BTN1_PRESSED_db) == DEBOUNCE_RISING_EDGE_e)
     {
-        s_AC_BTNManualControl_s.any_button_pressed_b = False_b;
+        // MTCL_SetReferencePosition(MDA_GetData_ps()->angular_position__rad__F32 + 0.058448f);
+        s_AC_BTNManualControl_s.BTN_ReferencePosition__rad__F32 = MDA_GetData_ps()->angular_position__rad__F32 + 0.058448f;
+        s_AC_BTNManualControl_s.any_button_pressed_b = True_b;
+    }
+    else if (AC_BtnDebounce_U16(&AC_Btn2Debounce_s, AC_BTN2_PRESSED_db) == DEBOUNCE_RISING_EDGE_e)
+    {
+        // MTCL_SetReferencePosition(MDA_GetData_ps()->angular_position__rad__F32 - 0.058448f);
+        s_AC_BTNManualControl_s.BTN_ReferencePosition__rad__F32 = MDA_GetData_ps()->angular_position__rad__F32 - 0.058448f;
+        s_AC_BTNManualControl_s.any_button_pressed_b = True_b;
     }
     else
     {
-        s_AC_BTNManualControl_s.any_button_pressed_b = True_b;
-
-        if (AC_BTN1_PRESSED_b)
-        {
-            // MTCL_SetReferencePosition(MDA_GetData_ps()->angular_position__rad__F32 + 0.058448f);
-            s_AC_BTNManualControl_s.BTN_ReferencePosition__rad__F32 = MDA_GetData_ps()->angular_position__rad__F32 + 0.058448f;
-        }
-        if (AC_BTN2_PRESSED_b)
-        {
-            // MTCL_SetReferencePosition(MDA_GetData_ps()->angular_position__rad__F32 - 0.058448f);
-            s_AC_BTNManualControl_s.BTN_ReferencePosition__rad__F32 = MDA_GetData_ps()->angular_position__rad__F32 - 0.058448f;
-        }
+        s_AC_BTNManualControl_s.any_button_pressed_b = False_b;
     }
+    
 }
 
 inline const AC_BTNManualControl_struct* AC_GetBTNData_ps(void)

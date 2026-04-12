@@ -70,19 +70,16 @@ void dispCtrl_vInitDisplay(void){
     DELAY_US(7000);
     /* set RESET pin for display*/
 
-    GpioCtrlRegs.GPCGMUX1.bit.GPIO72 = 1;
-    GpioCtrlRegs.GPCGMUX1.bit.GPIO72 = 0;
-    GpioCtrlRegs.GPCDIR.bit.GPIO72 = 1;
-    GpioDataRegs.GPCCLEAR.bit.GPIO72 = 1;
+    // GpioCtrlRegs.GPCGMUX1.bit.GPIO72 = 1;
+    // GpioCtrlRegs.GPCGMUX1.bit.GPIO72 = 0;
+    // GpioCtrlRegs.GPCDIR.bit.GPIO72 = 1;
+    // GpioDataRegs.GPCCLEAR.bit.GPIO72 = 1;
 
-    GpioCtrlRegs.GPAGMUX2.bit.GPIO30 = 1;
-    GpioCtrlRegs.GPAGMUX2.bit.GPIO30 = 0;
-    GpioCtrlRegs.GPADIR.bit.GPIO30 = 1;
-    GpioDataRegs.GPACLEAR.bit.GPIO30 = 1;
-    GpioDataRegs.GPASET.bit.GPIO30 = 1;
+    GpioDataRegs.GPACLEAR.bit.GPIO24 = 1;
+    GpioDataRegs.GPASET.bit.GPIO24 = 1;
 
     DELAY_US(12000);
-    GpioDataRegs.GPACLEAR.bit.GPIO30 = 1;
+    GpioDataRegs.GPACLEAR.bit.GPIO24 = 1;
     DELAY_US(2000);
 
     //spi_vSendChar( (0xF8 ^ ( (char)0 << 2 ) ^ ( (char)0 << 1) ) ); /*start byte - 5 high,RW,RS*/

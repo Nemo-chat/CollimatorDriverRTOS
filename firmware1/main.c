@@ -140,8 +140,7 @@ void vApplicationStackOverflowHook( TaskHandle_t xTask, char *pcTaskName )
  */
 interrupt void MDA_AdcConverstionCompleteIsr(void)
 {
-    // ISR_MotorControlHandler();
-    GpioDataRegs.GPASET.bit.GPIO25 = 1;
+    GpioDataRegs.GPCSET.bit.GPIO77 = 1;
 
     // elapsedTime = (float)(CpuTimer1Regs.PRD.all - CpuTimer1Regs.TIM.all) * 0.005; 
 
@@ -149,12 +148,12 @@ interrupt void MDA_AdcConverstionCompleteIsr(void)
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     xSemaphoreGiveFromISR(SyncSemaphore, &xHigherPriorityTaskWoken);
 
-    AdcaRegs.ADCINTFLGCLR.bit.ADCINT1   = (U16)1;                                   /* Clear interrupt flag. */
+    AdcaRegs.ADCINTFLGCLR.bit.ADCINT1   = (U16)1;                                  
     PieCtrlRegs.PIEACK.bit.ACK1         = (U16)1;
     
     // CpuTimer1Regs.TCR.bit.TRB = 1;
 
-    GpioDataRegs.GPACLEAR.bit.GPIO25 = 1;
+    GpioDataRegs.GPCCLEAR.bit.GPIO77 = 1;
 
     if (xHigherPriorityTaskWoken == pdTRUE)
     {
@@ -162,9 +161,26 @@ interrupt void MDA_AdcConverstionCompleteIsr(void)
 
     }
 
+    // GpioDataRegs.GPCSET.bit.GPIO77 = 1;
+    
+    // ATB_IncrementTime();          
+    // MDA_UpdateData();             
+    // AC_ManualControlHandler();     
+    // if (AC_GetBTNData_ps()->any_button_pressed_b)
+    // {
+    //     MTCL_SetReferencePosition(AC_GetBTNData_ps()->BTN_ReferencePosition__rad__F32);
+    // }
+    // MTCL_MainHandler();        
+    // PWM_SetCompareValues(g_PWM_CompareValues.cmp_u,
+    //                      g_PWM_CompareValues.cmp_v,
+    //                      g_PWM_CompareValues.cmp_w);
+
+    // AdcaRegs.ADCINTFLGCLR.bit.ADCINT1   = (U16)1;                                  
+    // PieCtrlRegs.PIEACK.bit.ACK1         = (U16)1;
+    
+    // GpioDataRegs.GPCCLEAR.bit.GPIO77 = 1;
 }
 
-__interrupt void ipc1_isr_cpu2(void);
 __interrupt void ipc2_isr_cpu2(void);
 
 void main(void)
@@ -177,7 +193,7 @@ void main(void)
     mcu_vInitClocks();                              /* Initialize uC clock system. */
     Interrupt_initModule();       // Need reveiw if it neccessary
     Interrupt_initVectorTable();  // Need reveiw if it neccessary
-    IPC_ISRvInit_CPU1(&ipc1_isr_cpu2, &ipc2_isr_cpu2);          // Initialize IPC ISRs for CPU2
+    IPC_ISRvInit_CPU1(&ipc2_isr_cpu2);          // Initialize IPC ISRs for CPU2
     spi_PinsInit();                                 /* Initialize SPI pins, select master core CPU2 */
     SCI_PinsInit();                                 /* Initialize SCI pins, select master core CPU2 */
     ATB_Init();
@@ -249,8 +265,8 @@ void main(void)
     }
 
     // IPC synchronization with CPU2
-    while(IpcRegs.IPCSTS.bit.IPC17 == 0);
-    IpcRegs.IPCACK.bit.IPC17 = 1;
+    // while(IpcRegs.IPCSTS.bit.IPC17 == 0);
+    // IpcRegs.IPCACK.bit.IPC17 = 1;
 
     // Start the scheduler.  This should not return.
     vTaskStartScheduler();
@@ -264,7 +280,6 @@ void main(void)
 
 static void WriteToSharedMemoryTask_Func(void *pvParameters)
 {
-
     for(;;)
     {
         ctrWriteToSharedMemoryTaskHit++;
@@ -289,31 +304,6 @@ static void WriteToSharedMemoryTask_Func(void *pvParameters)
         vTaskPrioritySet(ProcessOutputTask, 1);
         vTaskPrioritySet(NULL,  1);
         ctrWriteToSharedMemoryTask++;
-
-
-    }
-}
-
-static void ProcessOutputTask_Func(void *pvParameters)
-{
-    uint32_t ulEventToProcess;
-    for(;;)
-    {
-        ulEventToProcess = ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-        if (ulEventToProcess != 0)
-        {   
-            GpioDataRegs.GPASET.bit.GPIO6 = 1;
-            /* Apply compare values from global buffer */
-            PWM_SetCompareValues(g_PWM_CompareValues.cmp_u,
-                                 g_PWM_CompareValues.cmp_v,
-                                 g_PWM_CompareValues.cmp_w);
-
-            ctrProcessOutputTask++;
-            GpioDataRegs.GPACLEAR.bit.GPIO6 = 1;
-            UBaseType_t uxPriority = uxTaskPriorityGet(NULL);        
-            vTaskPrioritySet(WriteToSharedMemoryTask,  uxPriority + 1); 
-            taskYIELD();
-        }
     }
 }
 
@@ -326,17 +316,16 @@ static void ProcessInputsTask_Func(void *pvParameters)
     {
         // Wait for the semaphore to be given by the ADC ISR
         xSemaphoreTake(SyncSemaphore, portMAX_DELAY);
-        GpioDataRegs.GPASET.bit.GPIO26 = 1;
+        GpioDataRegs.GPCSET.bit.GPIO70 = 1;
         
         ATB_IncrementTime();          
-        // Process the inputs and update the data structure with newly 
-        // acquired measurement data from the ADC and QEP.
-        MDA_UpdateData();             // Execution time is around 4.7 microseconds
+        // Process the inputs and update the data structure with newly acquired data
+        MDA_UpdateData();             
         AC_ManualControlHandler(); 
 
         // Increment the execution counter
         ctrProcessInputTask++;
-        GpioDataRegs.GPACLEAR.bit.GPIO26 = 1;
+        GpioDataRegs.GPCCLEAR.bit.GPIO70 = 1;
         UBaseType_t uxPriority = uxTaskPriorityGet(NULL);        
         vTaskPrioritySet(ApplicationTask,  uxPriority + 1); 
         xTaskNotifyGive(ApplicationTask); // Notify the Application Task that new data is available
@@ -352,49 +341,64 @@ static void ApplicationTask_Func(void *pvParameters)
 {
     // ulEventToProcess will hold the value returned by ulTaskNotifyTake
     uint32_t ulEventToProcess;
-
+    
     for(;;)
     {
         ulEventToProcess = ulTaskNotifyTake( pdTRUE, portMAX_DELAY );
         if (ulEventToProcess != 0)
         {   
-            GpioDataRegs.GPASET.bit.GPIO27 = 1;
+            GpioDataRegs.GPCSET.bit.GPIO72 = 1;
             // Set reference position from button control if any button is pressed
             if (AC_GetBTNData_ps()->any_button_pressed_b)
             {
                 MTCL_SetReferencePosition(AC_GetBTNData_ps()->BTN_ReferencePosition__rad__F32);
             }
             
-            // CpuTimer1Regs.TCR.bit.TRB = 1;
             // Perform application control tasks here
             IpcRegs.IPCSET.bit.IPC10 = 1;
             MTCL_MainHandler();        // Execution time is around 10 microseconds
             IpcRegs.IPCCLR.bit.IPC10 = 1;
-            // elapsedTime = (float)(CpuTimer1Regs.PRD.all - CpuTimer1Regs.TIM.all) * 0.005; 
             
-            // GpioDataRegs.GPACLEAR.bit.GPIO27 = 1;
             xTaskNotifyGive(ProcessOutputTask);
-            // vTaskPrioritySet(ProcessOutputTask, 3);  
-            // GpioDataRegs.GPASET.bit.GPIO27 = 1;
-
             
             static uint8_t ApplicationCounter = 0;
             ApplicationCounter++;
             if (ApplicationCounter >= ADCInterruptsNumber)
             {
                 ApplicationCounter = 0;
-                // GpioDataRegs.GPACLEAR.bit.GPIO27 = 1;
-                xTaskNotifyGive(WriteToSharedMemoryTask);
-                // GpioDataRegs.GPASET.bit.GPIO27 = 1;
-                
+                // xTaskNotifyGive(WriteToSharedMemoryTask);
             }
             
             // Increment the execution counter
             ctrApplicationTask++;
-            GpioDataRegs.GPACLEAR.bit.GPIO27 = 1;
+            GpioDataRegs.GPCCLEAR.bit.GPIO72 = 1;
             UBaseType_t uxPriority = uxTaskPriorityGet(NULL);        
             vTaskPrioritySet(ProcessOutputTask,  uxPriority + 1); 
      
+            taskYIELD();
+        }
+    }
+}
+
+static void ProcessOutputTask_Func(void *pvParameters)
+{
+    uint32_t ulEventToProcess;
+    for(;;)
+    {
+        ulEventToProcess = ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        if (ulEventToProcess != 0)
+        {   
+            GpioDataRegs.GPCSET.bit.GPIO74 = 1;
+            /* Apply compare values from global buffer */
+            PWM_SetCompareValues(g_PWM_CompareValues.cmp_u,
+                                 g_PWM_CompareValues.cmp_v,
+                                 g_PWM_CompareValues.cmp_w);
+            // PWM_SetCompareValues(0.0, 0.0, 0.0);
+
+            ctrProcessOutputTask++;
+            GpioDataRegs.GPCCLEAR.bit.GPIO74 = 1;
+            UBaseType_t uxPriority = uxTaskPriorityGet(NULL);        
+            vTaskPrioritySet(WriteToSharedMemoryTask,  uxPriority + 1); 
             taskYIELD();
         }
     }
@@ -443,46 +447,6 @@ __interrupt void ipc2_isr_cpu2(void)
 
     portYIELD_FROM_ISR(pdTRUE);
 
-}
-__interrupt void ipc1_isr_cpu2(void)
-{
-    ctrInterruptEventIPC1_from_CPU2++;
-
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-
-    vTaskNotifyGiveFromISR(WriteToSharedMemoryTask, &xHigherPriorityTaskWoken);
-
-    // Clear the IPC interrupt flag
-    IpcRegs.IPCCLR.bit.IPC1 = 1;                // Clear the IPC1 interrupt flag
-    PieCtrlRegs.PIEACK.bit.ACK1 = 1;			// Must acknowledge the PIE group
-
-    if (xHigherPriorityTaskWoken == pdTRUE)
-    {
-        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-    }
-}
-
-void lockCPU1(void)
-{
-    while(1)
-    {
-        if(IpcRegs.IPCSTS.bit.IPC0 == 0)
-        {
-            IpcRegs.IPCSET.bit.IPC0 = 1;
-
-            if(IpcRegs.IPCFLG.bit.IPC0 == 1)
-            {
-                return; 
-            }
-        }
-    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-    }
-}
-
-void unlockCPU1(void)
-{
-    IpcRegs.IPCCLR.bit.IPC0 = 1;
-    IpcRegs.IPCSET.bit.IPC1 = 1; 
 }
 
 /**

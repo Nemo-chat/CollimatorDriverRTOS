@@ -20,7 +20,7 @@
 #include <main.h>
 
 /* Defines and macros */
-#define     ATB_TICK__us__dU16              ( (U16)50 )                             /**< Period of one application time base tick. */
+#define     ATB_TICK__us__dU16              ( (U16)100 )                             /**< Period of one application time base tick. */
 
 /* Time to ticks macros. */
 #define     ATB_US_TO_TICKS_dM_U32(us)      ( (U32)((us) / ATB_TICK__us__dU16) )

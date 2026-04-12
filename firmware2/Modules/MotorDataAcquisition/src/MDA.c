@@ -42,38 +42,44 @@ static inline void MDA_AdcInit(interrupt void (*adc_isr)(void))
     /* Enable ADC clocks. */
     CpuSysRegs.PCLKCR13.bit.ADC_A       = (U16)1;                                   /* Enable ADCA clock. */
     CpuSysRegs.PCLKCR13.bit.ADC_B       = (U16)1;                                   /* Enable ADCB clock. */
-
+    CpuSysRegs.PCLKCR13.bit.ADC_C       = (U16)1;                                   /* Enable ADCC clock. */
+    CpuSysRegs.PCLKCR13.bit.ADC_D       = (U16)1;                                   /* Enable ADCD clock. */
+    
     /* Prescaling clocks -> ADC_CLK = CPU_CLK / 2 = 100 MHz. */
     AdcaRegs.ADCCTL2.bit.PRESCALE       = (U16)2;
     AdcbRegs.ADCCTL2.bit.PRESCALE       = (U16)2;
-
+    AdccRegs.ADCCTL2.bit.PRESCALE       = (U16)2;
+    AdcdRegs.ADCCTL2.bit.PRESCALE       = (U16)2;
+    
     AdcaRegs.ADCCTL1.bit.INTPULSEPOS    = (U16)1;
 
     /* Enable power to ADCs. */
     AdcaRegs.ADCCTL1.bit.ADCPWDNZ       = (U16)1;
     AdcbRegs.ADCCTL1.bit.ADCPWDNZ       = (U16)1;
+    AdccRegs.ADCCTL1.bit.ADCPWDNZ       = (U16)1;
+    AdcdRegs.ADCCTL1.bit.ADCPWDNZ       = (U16)1;
 
     DELAY_US(MDA_ADC_STARTUP_DELAY__us__U32);                                       /* Wait for ADC power up. */
 
-    /* Channel ADCINA1 - Phase U current measurement. */
-    AdcaRegs.ADCSOC1CTL.bit.CHSEL       = (U16)1;                                   /* ADCIN1 */
-    AdcaRegs.ADCSOC1CTL.bit.TRIGSEL     = (U16)0x09;                                /* ADCTRIG9 - ePWM3, ADCSOCA */
-    AdcaRegs.ADCSOC1CTL.bit.ACQPS       = MDA_ADC_CURRENT_MEASUREMENT_WINDOWS_dU16; /* Sample current 20 ADC clocks. */
-
-    /* Channel ADCINB0 - Phase V current measurement. */
-    AdcbRegs.ADCSOC0CTL.bit.CHSEL       = (U16)0;                                   /* ADCIN0 */
-    AdcbRegs.ADCSOC0CTL.bit.TRIGSEL     = (U16)0x09;                                /* ADCTRIG9 - ePWM3, ADCSOCA */
-    AdcbRegs.ADCSOC0CTL.bit.ACQPS       = MDA_ADC_CURRENT_MEASUREMENT_WINDOWS_dU16; /* Sample current 20 ADC clocks. */
-
-    /* Channel ADCINA0 - Phase W current measurement. */
+    /* Channel ADCINA0 - Phase U current measurement. */
     AdcaRegs.ADCSOC0CTL.bit.CHSEL       = (U16)0;                                   /* ADCIN0 */
     AdcaRegs.ADCSOC0CTL.bit.TRIGSEL     = (U16)0x09;                                /* ADCTRIG9 - ePWM3, ADCSOCA */
     AdcaRegs.ADCSOC0CTL.bit.ACQPS       = MDA_ADC_CURRENT_MEASUREMENT_WINDOWS_dU16; /* Sample current 20 ADC clocks. */
 
-    /* Channel ADCINB1 - DC link voltage measurement. */
-    AdcbRegs.ADCSOC1CTL.bit.CHSEL       = (U16)1;                                   /* ADCIN1 */
-    AdcbRegs.ADCSOC1CTL.bit.TRIGSEL     = (U16)0x0a;                                /* ADCTRIG10 - ePWM3, ADCSOCB */
-    AdcbRegs.ADCSOC1CTL.bit.ACQPS       = MDA_ADC_CURRENT_MEASUREMENT_WINDOWS_dU16; /* Sample current 20 ADC clocks. */
+    /* Channel ADCINB1 - Phase V current measurement. */
+    AdcbRegs.ADCSOC0CTL.bit.CHSEL       = (U16)1;                                   /* ADCIN1 */
+    AdcbRegs.ADCSOC0CTL.bit.TRIGSEL     = (U16)0x09;                                /* ADCTRIG9 - ePWM3, ADCSOCA */
+    AdcbRegs.ADCSOC0CTL.bit.ACQPS       = MDA_ADC_CURRENT_MEASUREMENT_WINDOWS_dU16; /* Sample current 20 ADC clocks. */
+
+    /* Channel ADCINC2 - Phase W current measurement. */
+    AdccRegs.ADCSOC0CTL.bit.CHSEL       = (U16)2;                                   /* ADCIN2 */
+    AdccRegs.ADCSOC0CTL.bit.TRIGSEL     = (U16)0x09;                                /* ADCTRIG9 - ePWM3, ADCSOCA */
+    AdccRegs.ADCSOC0CTL.bit.ACQPS       = MDA_ADC_CURRENT_MEASUREMENT_WINDOWS_dU16; /* Sample current 20 ADC clocks. */
+
+    /* Channel ADCIND0 - DC link voltage measurement. */
+    AdcdRegs.ADCSOC1CTL.bit.CHSEL       = (U16)0;                                   /* ADCIN0 */
+    AdcdRegs.ADCSOC1CTL.bit.TRIGSEL     = (U16)0x0a;                                /* ADCTRIG10 - ePWM3, ADCSOCB */
+    AdcdRegs.ADCSOC1CTL.bit.ACQPS       = MDA_ADC_CURRENT_MEASUREMENT_WINDOWS_dU16; /* Sample current 20 ADC clocks. */
 
     /* Interrupt setup. */
     AdcaRegs.ADCINTSEL1N2.bit.INT1E     = (U16)1;                                   /* Enable interrupt 1. */
