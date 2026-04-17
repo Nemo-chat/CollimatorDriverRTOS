@@ -10,14 +10,17 @@ void SCI_PinsInit(void)
 {
     EALLOW;
     /* SCIRXDA */
-    GpioCtrlRegs.GPCGMUX1.bit.GPIO64 = 1;
-    GpioCtrlRegs.GPCMUX1.bit.GPIO64 = 2;
-    GpioCtrlRegs.GPCCSEL1.bit.GPIO64 = 3; // select master core CPU2
+    GpioCtrlRegs.GPAGMUX2.bit.GPIO28 = 0;
+    GpioCtrlRegs.GPAMUX2.bit.GPIO28 = 1;
+    GpioCtrlRegs.GPACSEL4.bit.GPIO28 = 2; // select master core CPU2
 
     /* SCITXDA */
-    GpioCtrlRegs.GPCGMUX1.bit.GPIO65 = 1;
-    GpioCtrlRegs.GPCMUX1.bit.GPIO65 = 2;
-    GpioCtrlRegs.GPCCSEL1.bit.GPIO65 = 3; // select master core CPU2
+    GpioCtrlRegs.GPAGMUX2.bit.GPIO29 = 0;
+    GpioCtrlRegs.GPAMUX2.bit.GPIO29 = 1;
+    GpioCtrlRegs.GPADIR.bit.GPIO28  = 1;   // TX = output
+    GpioCtrlRegs.GPACSEL4.bit.GPIO29 = 2; // select master core CPU2
+
+    DevCfgRegs.CPUSEL5.bit.SCI_A = 1;     // 0 = CPU1 owner, 1 = CPU2 owner
 
     EDIS;
 }
@@ -43,12 +46,13 @@ void SCI_Init(void)
     SciaRegs.SCICTL1.bit.TXENA = 1;                 /* Enable TX. */
 
     /* Baud config */
-    U16 BRR_U16 = 109;
+    U16 BRR_U16 = 108;
     SciaRegs.SCIHBAUD.bit.BAUD = (BRR_U16 >> 8);
     SciaRegs.SCILBAUD.bit.BAUD = BRR_U16 & (0x00FF);
 
-    SciaRegs.SCIFFTX.bit.SCIFFENA = (U16)1;         /* Enable FIFO for communication interface. */
+    SciaRegs.SCIFFTX.bit.SCIFFENA    = (U16)1;         /* Enable FIFO for communication interface. */
     SciaRegs.SCIFFTX.bit.TXFIFORESET = (U16)1;
+    SciaRegs.SCIFFRX.bit.RXFIFORESET = (U16)1;
 
     SciaRegs.SCICTL1.bit.SWRESET = 1;               /* Reset SCI communication. */
     EDIS;

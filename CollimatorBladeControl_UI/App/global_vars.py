@@ -14,6 +14,7 @@ transaction_lock = True
 remote_position = 0.0
 remote_max_position = 0.0
 movement_enable_state = False
+service_mode_active = False
 
 
 def set_movement_enable_state(new_state):
@@ -24,6 +25,16 @@ def set_movement_enable_state(new_state):
 def get_movement_enable_state():
     global movement_enable_state
     return movement_enable_state
+
+
+def set_service_mode_active(new_state):
+    global service_mode_active
+    service_mode_active = new_state
+
+
+def get_service_mode_active():
+    global service_mode_active
+    return service_mode_active
 
 
 def set_remote_max_position(max_pos):

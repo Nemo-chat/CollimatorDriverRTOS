@@ -81,6 +81,7 @@ void dispCtrl_vInitDisplay(void){
     DELAY_US(12000);
     GpioDataRegs.GPACLEAR.bit.GPIO24 = 1;
     DELAY_US(2000);
+    GpioDataRegs.GPASET.bit.GPIO24 = 1;
 
     //spi_vSendChar( (0xF8 ^ ( (char)0 << 2 ) ^ ( (char)0 << 1) ) ); /*start byte - 5 high,RW,RS*/
 

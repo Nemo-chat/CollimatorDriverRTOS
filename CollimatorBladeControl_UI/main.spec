@@ -5,7 +5,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('img', 'img')],
+    datas=[('img', 'img'), ('appconfig.json', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -14,7 +14,6 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
-
 pyz = PYZ(a.pure)
 
 exe = EXE(
@@ -23,7 +22,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='Collimator Contol GUI',
+    name='collimator control gui',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

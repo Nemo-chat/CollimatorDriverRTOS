@@ -47,8 +47,14 @@ static void ECOM_RxHandler(void)
 
     if(SCI_RX_BYTES_AVAILABLE_dMU16 != (U16)0)                                                                        /* Check RX FIFO buffer level. */
     {
+        U16 rx_count_U16 = (U16)SCI_RX_BYTES_AVAILABLE_dMU16;
         s_bytes_recieved_flag_b = True_b;
-        ECOM_WriteDataToBuffer(&s_ECOM_rx_buffer_s, (const U16*)&SCI_RX_BUFF_dM, (U16)SCI_RX_BYTES_AVAILABLE_dMU16);     /* Write buffer structure with new data. */
+        while(rx_count_U16 != (U16)0)                                                                              /* Read FIFO register one byte at a time. */
+        {
+            U16 rx_byte_U16 = SCI_RX_BUFF_dM & (U16)0x00FF;                                                        /* Pop one byte from SCI RX FIFO; mask off upper status bits. */
+            ECOM_WriteDataToBuffer(&s_ECOM_rx_buffer_s, &rx_byte_U16, (U16)1);
+            rx_count_U16 -= (U16)1;
+        }
         s_last_rx_timestamp_U32 = ATB_GetTicks_U32();                                                             /* Write new data timestamp. */
     }
     else if( ATB_CheckTicksPassed_U16(s_last_rx_timestamp_U32, ECOM_MSC_TIMEOUT_TICKS_dU32)                       /* Check if msg timeout elapsed. */

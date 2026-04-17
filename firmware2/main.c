@@ -27,7 +27,6 @@
 #include <PI_Controller.h>
 #include "spi.h"
 #include "dispCtrl.h"
-
 #include "FreeRTOS.h"
 #include "task.h"
 #include "semphr.h"
@@ -49,11 +48,11 @@
 typedef struct
 {
     MDA_Data_struct mda_data_s;
-    AC_BTNManualControl_struct ac_btn_manual_control_s;
     MTCL_Control_struct mtcl_control_s;
     MTCL_MovementParams_struct mtcl_movement_params_s;
     F32 mtcl_maximum_position_rad_F32;
     boolean foc_enable_state_b;
+    boolean active_service_mode_b;
 
 }SharedDataCPU1TOCPU2_struct;
 
@@ -200,14 +199,13 @@ static void CommunicationTask_Func(void *pvParameters)
         
         ECOM_MainHandler();        
 
-        if (AC_GetLastReceivedCommand() < AC_CMD_GET_MOVEMENT_PARAMS_e)
+        if ((AC_GetLastReceivedCommand() < AC_CMD_GET_MOVEMENT_PARAMS_e) && !AC_GetServiceModeActive()) // If the received command is a control command and service mode is not active, notify WriteCommandToSharedMemoryTask to write the command to shared memory for CPU2 to read and execute
         {
             xTaskNotifyGive(WriteCommandToSharedMemoryTask);   
         }
                 
         /* Reset command marker for next cycle */
         AC_ClearLastReceivedCommand();
-        
 
         // Increment the execution counter
         ctrCommunicationTask++;
@@ -305,6 +303,7 @@ __interrupt void ipc3_isr_cpu1(void)
     MTCL_SetMaximumPosition_F32(&SharedDataCPU1TOCPU2.mtcl_maximum_position_rad_F32); // Update MTCL maximum position in shared structure
     FOC_SetEnableState(SharedDataCPU1TOCPU2.foc_enable_state_b); // Update FOC enable state in shared structure
     s_MTCL_Control_s.over_torque_error_f1 = SharedDataCPU1TOCPU2.mtcl_control_s.over_torque_error_f1; // Update MTCL control struct in shared structure
+    AC_SetServiceModeActive(SharedDataCPU1TOCPU2.active_service_mode_b); // Update service mode state in shared structure
 
     uint8_t i;
     for (i = 0; i < 10; i++) 

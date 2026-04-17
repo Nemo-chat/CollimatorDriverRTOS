@@ -19,7 +19,7 @@
 #include "F2837xD_device.h"
 #include <main.h>
 
-#define I_Q_KP_df32            ( (F32)1.2f )     /**< MACRO proportional part for Iq controller*/
+#define I_Q_KP_df32            ( (F32)2.2f )     /**< MACRO proportional part for Iq controller*/
 #define I_D_KP_df32            ( (F32)1.2f )     /**< MACRO proportional part for Id controller*/
 #define SPEED_KP_df32          ( (F32)0.237f )   /**< MACRO proportional part for speed controller*/
 #define POSITION_KP_df32       ( (F32)40.0f )    /**< MACRO proportional part for position controller */

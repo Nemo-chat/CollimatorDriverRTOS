@@ -24,31 +24,32 @@ void TEST_ScalarMotorMovementHandler(void)
     kukam_prud();
 }
 
-//F32 current_a[512];
-//F32 current_b[512];
-//F32 current_c[512];
+// F32 current_a[512];
+// F32 current_b[512];
+// F32 current_c[512];
 //F32 current_d[1024];
 //F32 current_q[1024];
 
-U16 index_prud=0;
-//F32 speed[3000];
-//F32 prud_iq[3000];
-F32 position[3000];
+// U16 index_prud=0;
+// //F32 speed[3000];
+// //F32 prud_iq[3000];
+// //F32 position[3000];
 
 void kukam_prud(){
-    if(index_prud < 3000){
-//        MDA_GetRawPhaseCurrents( &current_a[index_prud],
-//                                 &current_b[index_prud],
-//                                 &current_c[index_prud] );
+    // if(index_prud < 512){
+    //    MDA_GetRawPhaseCurrents( &current_a[index_prud],
+    //                             &current_b[index_prud],
+    //                             &current_c[index_prud] );
 
 
         //speed[index_prud] = PC_GetData_ps()->tj.Speed__rad_s__F32;
         //prud_iq[index_prud] = PC_GetData_ps()->tj.Acceleration__rad_s_2__F32;
-        position[index_prud] = PC_GetData_ps()->tj.Position__rad__F32;
-        index_prud++;
-    }
-    else index_prud = 0;
+        // position[index_prud] = PC_GetData_ps()->tj.Position__rad__F32;
+    //     index_prud++;
+    // }
+    // else index_prud = 0;
 
+    // }
 }
 
 void TEST_SteppingHandler(void)

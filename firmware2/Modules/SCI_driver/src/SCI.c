@@ -10,14 +10,16 @@ void SCI_PinsInit(void)
 {
     EALLOW;
     /* SCIRXDA */
-    GpioCtrlRegs.GPCGMUX1.bit.GPIO64 = 1;
-    GpioCtrlRegs.GPCMUX1.bit.GPIO64 = 2;
-    GpioCtrlRegs.GPCCSEL1.bit.GPIO64 = 3; // select master core CPU2
+    GpioCtrlRegs.GPAGMUX2.bit.GPIO28 = 0;
+    GpioCtrlRegs.GPAMUX2.bit.GPIO28 = 1;
+    GpioCtrlRegs.GPACSEL4.bit.GPIO28 = 2; // select master core CPU2
 
     /* SCITXDA */
-    GpioCtrlRegs.GPCGMUX1.bit.GPIO65 = 1;
-    GpioCtrlRegs.GPCMUX1.bit.GPIO65 = 2;
-    GpioCtrlRegs.GPCCSEL1.bit.GPIO65 = 3; // select master core CPU2
+    GpioCtrlRegs.GPAGMUX2.bit.GPIO29 = 0;
+    GpioCtrlRegs.GPAMUX2.bit.GPIO29 = 1;
+    GpioCtrlRegs.GPACSEL4.bit.GPIO29 = 2; // select master core CPU2
+
+    DevCfgRegs.CPUSEL5.bit.SCI_A = 1;     // 0 = CPU1 owner, 1 = CPU2 owner
 
     EDIS;
 }
@@ -29,7 +31,6 @@ void SCI_Init(void)
 
     // Clock config
     CpuSysRegs.PCLKCR7.bit.SCI_A = 1;
-    ClkCfgRegs.LOSPCP.bit.LSPCLKDIV = 1;
 
     /* SCIA Setup */
     SciaRegs.SCICCR.bit.STOPBITS = 0;               /* 1 stop bit. */
@@ -38,21 +39,23 @@ void SCI_Init(void)
     SciaRegs.SCICCR.bit.ADDRIDLE_MODE = 0;          /* Idle mode communication - RS232. */
     SciaRegs.SCICCR.bit.SCICHAR = 7;                /* 8 data bits. */
 
-    SciaRegs.SCICTL1.bit.TXWAKE = 1;
+    SciaRegs.SCICTL1.bit.TXWAKE = 0;                /* No address/wake preamble. */
     SciaRegs.SCICTL1.bit.RXENA = 1;                 /* Enable RX. */
     SciaRegs.SCICTL1.bit.TXENA = 1;                 /* Enable TX. */
 
-    /* Baud config */
-    U16 BRR_U16 = 109;
-    SciaRegs.SCIHBAUD.bit.BAUD = (BRR_U16 >> 8);
-    SciaRegs.SCILBAUD.bit.BAUD = BRR_U16 & (0x00FF);
+    /* Baud config for 57600 baud.
+     * LSPCLK = SYSCLK / 14 = 200MHz / 14 = 14.286MHz (LSPCLKDIV=7 set by mcu_vInitClocks on CPU1).
+     * BRR = LSPCLK / (BAUD * 8) - 1 = 14285714 / (57600 * 8) - 1 = 30.
+     * NOTE: CPU2 cannot read LOSPCP correctly (reads 0), so BRR is hardcoded. */
+    SciaRegs.SCIHBAUD.bit.BAUD = (U16)0;
+    SciaRegs.SCILBAUD.bit.BAUD = (U16)30;
 
-    SciaRegs.SCIFFTX.bit.SCIFFENA = (U16)1;         /* Enable FIFO for communication interface. */
+    SciaRegs.SCIFFTX.bit.SCIFFENA    = (U16)1;         /* Enable FIFO for communication interface. */
     SciaRegs.SCIFFTX.bit.TXFIFORESET = (U16)1;
+    SciaRegs.SCIFFRX.bit.RXFIFORESET = (U16)1;
 
     SciaRegs.SCICTL1.bit.SWRESET = 1;               /* Reset SCI communication. */
     EDIS;
-    SciaRegs.SCITXBUF.all = 0;
 }
 
 #warning "Function deprecated!"

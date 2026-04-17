@@ -87,18 +87,26 @@ class InputSlider:
 
 
 class TwoStateBtn:
-    def __init__(self, root, texts=('Off', 'On'), callbacks=(None, None), default_state=0):
+    def __init__(self, root, texts=('Off', 'On'), callbacks=(None, None), default_state=0, colors=None):
         self.textVar = StringVar()
         self.textVar.set(texts[default_state])
         self.state = default_state
         self.btn_texts = texts
         self.callbacks = callbacks
+        self.colors = colors  # tuple of (bg0, fg0), (bg1, fg1) or None
 
         self.elmnt = Button(root, textvariable=self.textVar, command=self.__onclick__, padx=10)
+        self.__apply_color__()
+
+    def __apply_color__(self):
+        if self.colors is not None:
+            bg, fg = self.colors[self.state]
+            self.elmnt.config(bg=bg, fg=fg, activebackground=bg, activeforeground=fg)
 
     def __onclick__(self):
         self.state ^= 1
         self.textVar.set(self.btn_texts[self.state])
+        self.__apply_color__()
         if self.callbacks[self.state] is not None:
             self.callbacks[self.state]()
 
@@ -107,3 +115,4 @@ class TwoStateBtn:
             return
         self.state = new_state
         self.textVar.set(self.btn_texts[self.state])
+        self.__apply_color__()

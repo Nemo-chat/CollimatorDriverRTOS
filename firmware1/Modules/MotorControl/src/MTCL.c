@@ -204,10 +204,10 @@ static void MTCL_CalculateTrajectory(F32 Requested_Position__rad__F32, F32 MaxMe
 
     i++;
     if(i > 40){
-        if(s_PC_data_s.tj.Speed__rad_s__F32 != 0){
+        // if(s_PC_data_s.tj.Speed__rad_s__F32 != 0){
             kukam_prud();
             i=0;
-        }
+        
     }
 }
 

@@ -11,7 +11,7 @@ class ConfigHandler:
     DEFAULT_CONFIG = {
         'serial_port': {
             'port': '',
-            'baud_rate': 115200,
+            'baud_rate': 57600,
             'auto_connect': False
         }
     }

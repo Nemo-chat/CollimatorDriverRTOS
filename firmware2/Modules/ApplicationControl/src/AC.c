@@ -23,6 +23,7 @@
 AC_BTNManualControl_struct s_AC_BTNManualControl_s = {False_b, 0.0f};    /**< Button manual control struct. */
 AC_CommandIndex_enum AC_LastReceivedCommand_e = AC_CMD_NONE_e;                          /**< Last received command index. */
 boolean AC_Reset_ErrorFlags_b = False_b;                                                        /**< Flag for resetting error flags in motor control module. */
+boolean s_AC_ServiceModeActive_b = False_b;                                              /**< Service mode active flag. */
 
 AC_CommandIndex_enum AC_GetLastReceivedCommand(void)
 {
@@ -32,6 +33,16 @@ AC_CommandIndex_enum AC_GetLastReceivedCommand(void)
 void AC_ClearLastReceivedCommand(void)
 {
     AC_LastReceivedCommand_e = AC_CMD_NONE_e;
+}
+
+boolean AC_GetServiceModeActive(void)
+{
+    return s_AC_ServiceModeActive_b;
+}
+
+void AC_SetServiceModeActive(boolean active_b)
+{
+    s_AC_ServiceModeActive_b = active_b;
 }
 
 /**
@@ -131,6 +142,15 @@ void AC_ExecuteCommand( const U16 * const command_payload_pU16,
 
     if(AC_CORE_CHECK_INDEX_BOUND_dM_b(command_payload_pU16[0]))
     {
+        /* Block SET commands (indices 0-3) in service mode */
+        if(s_AC_ServiceModeActive_b && command_payload_pU16[0] <= AC_CMD_RESET_ERROR_FLAGS_e)
+        {
+            response_data_pU16[0] = ERROR_e;
+            *response_data_size_pU16 = 1;
+            AC_LastReceivedCommand_e = AC_CMD_NONE_e;
+            return;
+        }
+
         AC_Functions[command_payload_pU16[0]]( (command_payload_pU16 + 1),
                                               (payload_size_U16 - 1),
                                               response_data_pU16,
@@ -317,6 +337,38 @@ static void AC_CMD_SetMovmentEnableState( const void* const payload_p,
     FOC_SetEnableState(((U16*)payload_p)[0]);
     response_data_pU16[0] = RESPONSE_OK_e;
     *response_data_size_pU16 = 1;
+}
+
+static void AC_CMD_GetFocState( const void* const payload_p,
+                                const U16 payload_size_U16,
+                                U16 * response_data_pU16,
+                                U16 * response_data_size_pU16)
+{
+    if(payload_size_U16 != 0)
+    {
+        response_data_pU16[0] = INVALID_INPUT_e;
+        *response_data_size_pU16 = 1;
+        return;
+    }
+    response_data_pU16[0] = RESPONSE_OK_e;
+    response_data_pU16[1] = (U16)FOC_GetEnableState();
+    *response_data_size_pU16 = 2;
+}
+
+static void AC_CMD_GetServiceMode( const void* const payload_p,
+                                   const U16 payload_size_U16,
+                                   U16 * response_data_pU16,
+                                   U16 * response_data_size_pU16)
+{
+    if(payload_size_U16 != 0)
+    {
+        response_data_pU16[0] = INVALID_INPUT_e;
+        *response_data_size_pU16 = 1;
+        return;
+    }
+    response_data_pU16[0] = RESPONSE_OK_e;
+    response_data_pU16[1] = (U16)AC_GetServiceModeActive();
+    *response_data_size_pU16 = 2;
 }
 
 /**

@@ -29,8 +29,8 @@ def write_new_mech_data(data):
         parameters_strings['pos'].set(str(loc_parameters[1] / 1000))
         parameters_strings['rotor_pos'].set(str(loc_parameters[2] / 1000))
         set_remote_position(loc_parameters[1] / 1000)
-    except:
-        pass
+    except Exception as e:
+        print(f'[MECH_DATA] Response error: {e}, raw data ({len(data)}B): {data.hex() if data else "empty"}')
 
 
 def write_new_electrical_data(data):
@@ -40,8 +40,8 @@ def write_new_electrical_data(data):
         parameters_strings['id'].set(str(loc_parameters[0] / 1000))
         parameters_strings['iq'].set(str(loc_parameters[1] / 1000))
         parameters_strings['link_voltage'].set(str(loc_parameters[2] / 1000))
-    except:
-        pass
+    except Exception as e:
+        print(f'[ELEC_DATA] Response error: {e}, raw data ({len(data)}B): {data.hex() if data else "empty"}')
 
 
 def update_data_electrical():

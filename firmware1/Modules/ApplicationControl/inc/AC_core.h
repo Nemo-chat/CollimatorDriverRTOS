@@ -21,6 +21,8 @@
 
 #define AC_BTN1_PRESSED_db          ( (boolean)!GpioDataRegs.GPBDAT.bit.GPIO40 )    /**< Check if button 1 is pressed. */
 #define AC_BTN2_PRESSED_db          ( (boolean)!GpioDataRegs.GPBDAT.bit.GPIO41 )    /**< Check if button 1 is pressed. */
+#define AC_BTN3_PRESSED_db          ( (boolean)!GpioDataRegs.GPBDAT.bit.GPIO42 )    /**< Check if button 3 is pressed. */
+#define AC_BTN4_PRESSED_db          ( (boolean)!GpioDataRegs.GPBDAT.bit.GPIO43 )    /**< Check if button 4 is pressed. */
 
 /* Button debouncing structure. */
 typedef struct
@@ -29,6 +31,7 @@ typedef struct
     U32 falling_edge_ticks_U32;
     boolean last_state_b;
     boolean debounced_state_b;
+    boolean was_pressed_b; 
 } AC_BtnDebounce_struct;
 
 /* Debounced button state. */
@@ -92,6 +95,16 @@ static void AC_CMD_SetMovmentEnableState( const void* const payload_p,
                                           U16 * response_data_pU16,
                                           U16 * response_data_size_pU16);
 
+static void AC_CMD_GetFocState( const void* const payload_p,
+                                const U16 payload_size_U16,
+                                U16 * response_data_pU16,
+                                U16 * response_data_size_pU16);
+
+static void AC_CMD_GetServiceMode( const void* const payload_p,
+                                   const U16 payload_size_U16,
+                                   U16 * response_data_pU16,
+                                   U16 * response_data_size_pU16);
+
 static AC_ControlFunction_pF AC_Functions[] =
 {
     &AC_CMD_SetMovementParameters,
@@ -101,7 +114,9 @@ static AC_ControlFunction_pF AC_Functions[] =
     &AC_CMD_GetMovementParameters,
     &AC_CMD_GetMechanicalData,
     &AC_CMD_GetElectricalData,
-    &AC_CMD_GetMaximumPosition
+    &AC_CMD_GetMaximumPosition,
+    &AC_CMD_GetFocState,
+    &AC_CMD_GetServiceMode
 };
 
 

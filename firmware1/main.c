@@ -49,11 +49,11 @@
 typedef struct
 {
     MDA_Data_struct mda_data_s;
-    AC_BTNManualControl_struct ac_btn_manual_control_s;
     MTCL_Control_struct mtcl_control_s;
     MTCL_MovementParams_struct mtcl_movement_params_s;
     F32 mtcl_maximum_position_rad_F32;
     boolean foc_enable_state_b;
+    boolean active_service_mode_b;
 
 }SharedDataCPU1TOCPU2_struct;
 
@@ -142,8 +142,6 @@ interrupt void MDA_AdcConverstionCompleteIsr(void)
 {
     GpioDataRegs.GPCSET.bit.GPIO77 = 1;
 
-    // elapsedTime = (float)(CpuTimer1Regs.PRD.all - CpuTimer1Regs.TIM.all) * 0.005; 
-
     ctrInterruptEvent++;
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     xSemaphoreGiveFromISR(SyncSemaphore, &xHigherPriorityTaskWoken);
@@ -151,8 +149,6 @@ interrupt void MDA_AdcConverstionCompleteIsr(void)
     AdcaRegs.ADCINTFLGCLR.bit.ADCINT1   = (U16)1;                                  
     PieCtrlRegs.PIEACK.bit.ACK1         = (U16)1;
     
-    // CpuTimer1Regs.TCR.bit.TRB = 1;
-
     GpioDataRegs.GPCCLEAR.bit.GPIO77 = 1;
 
     if (xHigherPriorityTaskWoken == pdTRUE)
@@ -160,25 +156,6 @@ interrupt void MDA_AdcConverstionCompleteIsr(void)
         portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 
     }
-
-    // GpioDataRegs.GPCSET.bit.GPIO77 = 1;
-    
-    // ATB_IncrementTime();          
-    // MDA_UpdateData();             
-    // AC_ManualControlHandler();     
-    // if (AC_GetBTNData_ps()->any_button_pressed_b)
-    // {
-    //     MTCL_SetReferencePosition(AC_GetBTNData_ps()->BTN_ReferencePosition__rad__F32);
-    // }
-    // MTCL_MainHandler();        
-    // PWM_SetCompareValues(g_PWM_CompareValues.cmp_u,
-    //                      g_PWM_CompareValues.cmp_v,
-    //                      g_PWM_CompareValues.cmp_w);
-
-    // AdcaRegs.ADCINTFLGCLR.bit.ADCINT1   = (U16)1;                                  
-    // PieCtrlRegs.PIEACK.bit.ACK1         = (U16)1;
-    
-    // GpioDataRegs.GPCCLEAR.bit.GPIO77 = 1;
 }
 
 __interrupt void ipc2_isr_cpu2(void);
@@ -265,8 +242,8 @@ void main(void)
     }
 
     // IPC synchronization with CPU2
-    // while(IpcRegs.IPCSTS.bit.IPC17 == 0);
-    // IpcRegs.IPCACK.bit.IPC17 = 1;
+    while(IpcRegs.IPCSTS.bit.IPC17 == 0);
+    IpcRegs.IPCACK.bit.IPC17 = 1;
 
     // Start the scheduler.  This should not return.
     vTaskStartScheduler();
@@ -287,13 +264,13 @@ static void WriteToSharedMemoryTask_Func(void *pvParameters)
 
         // lockCPU1();
         SharedDataCPU1TOCPU2.mda_data_s = *MDA_GetData_ps();                 // Read updated data from shared memory
-        SharedDataCPU1TOCPU2.ac_btn_manual_control_s = *AC_GetBTNData_ps();  // Read updated button control data from shared memory
         SharedDataCPU1TOCPU2.foc_enable_state_b = FOC_GetEnableState();      // Update FOC enable state in shared data
         SharedDataCPU1TOCPU2.mtcl_control_s = *MTCL_GetControlState_ps();    // Update MTCL control struct in shared data
         SharedDataCPU1TOCPU2.mtcl_maximum_position_rad_F32 = MTCL_GetMaximumPosition_F32();
         MTCL_GetMovementParams(&SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxSpeed__rad_s__F32,
                                     &SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxAccel__rad_s2__F32,
                                     &SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxTorque__Nm__F32); // Update MTCL movement parameters in shared data
+        SharedDataCPU1TOCPU2.active_service_mode_b = AC_GetServiceModeActive(); // Update service mode state in shared data
         // unlockCPU1();
 
         IpcRegs.IPCSET.bit.IPC3 = 1; // Generate interrupt to notify CPU2 about updated data
@@ -325,10 +302,10 @@ static void ProcessInputsTask_Func(void *pvParameters)
 
         // Increment the execution counter
         ctrProcessInputTask++;
-        GpioDataRegs.GPCCLEAR.bit.GPIO70 = 1;
         UBaseType_t uxPriority = uxTaskPriorityGet(NULL);        
         vTaskPrioritySet(ApplicationTask,  uxPriority + 1); 
         xTaskNotifyGive(ApplicationTask); // Notify the Application Task that new data is available
+        GpioDataRegs.GPCCLEAR.bit.GPIO70 = 1;
         taskYIELD(); // Yield to allow Application Task to run immediately after processing inputs
 
     }
@@ -366,7 +343,7 @@ static void ApplicationTask_Func(void *pvParameters)
             if (ApplicationCounter >= ADCInterruptsNumber)
             {
                 ApplicationCounter = 0;
-                // xTaskNotifyGive(WriteToSharedMemoryTask);
+                xTaskNotifyGive(WriteToSharedMemoryTask);
             }
             
             // Increment the execution counter

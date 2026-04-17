@@ -22,9 +22,9 @@
 #define MDA_ADC_RESOLUTION_BITS_dU16                    ( (U16)12 )             /**< ADC resolution in bits. */
 #define MDA_ADC_STARTUP_DELAY__us__U32                  ( (U32)1000 )           /**< Delay time after ADC power up. */
 #define MDA_PHASE_CURRENT_SENSITIVITY_dF32              ( (F32)120.0E-3 )       /**< V / A */
-#define MDA_PHASE_CURRENT_ZERO_OFFSET__V__dF32          ( (F32)1.5 )            /**< DC voltage offset marking 0 A. */
+#define MDA_PHASE_CURRENT_ZERO_OFFSET__V__dF32          ( (F32)0 )              /**< DC voltage offset marking 0 A. */
 #define MDA_DC_LINK_VOLTAGE_SENSITIVITY_dF32            ( (F32)5.0E-3 )         /**< V / V */
-#define MDA_ADC_CURRENT_MEASUREMENT_WINDOWS_dU16        ( (U16)19 )             /**< Number of CPU clock cycles for ADC sampling. */
+#define MDA_ADC_CURRENT_MEASUREMENT_WINDOWS_dU16        ( (U16)59 )             /**< Number of CPU clock cycles for ADC sampling. */
 
 #define MDA_PHASE_CURRENT_CALIBRATION_STEPS_U16         ( (U16)1000 )           /**< Number of steps for DC current sensor offset calibration. */
 #define MDA_PHASE_CURRENT_CALIBRATION_STEP_DELAY__us__dU16 ( (U16)100 )         /**< Delay between calibration steps. */

@@ -21,11 +21,13 @@
 #include <FOC.h>
 
 AC_BTNManualControl_struct s_AC_BTNManualControl_s = {False_b, 0.0f};    /**< Button manual control struct. */
-AC_CommandIndex_enum AC_LastReceivedCommand_e = AC_CMD_NONE_e;                          /**< Last received command index. */
-boolean AC_Reset_ErrorFlags_b = False_b;                                                        /**< Flag for resetting error flags in motor control module. */
-
-U16 AC_BTN1_PRESSED_b = 0;                                                            /**< Button 1 pressed flag. */
-U16 AC_BTN2_PRESSED_b = 0;                                                            /**< Button 2 pressed flag.8 */
+AC_CommandIndex_enum AC_LastReceivedCommand_e = AC_CMD_NONE_e;           /**< Last received command index. */
+boolean AC_Reset_ErrorFlags_b = False_b;                                 /**< Flag for resetting error flags in motor control module. */
+boolean s_AC_ServiceModeActive_b = False_b;                               /**< Service mode active flag. */
+U16 AC_BTN1_PRESSED_b = 0;                                               /**< Button 1 pressed flag. */
+U16 AC_BTN2_PRESSED_b = 0;                                               /**< Button 2 pressed flag. */
+U16 AC_BTN3_PRESSED_b = 0;                                               /**< Button 3 pressed flag. */
+U16 AC_BTN4_PRESSED_b = 0;                                               /**< Button 4 pressed flag. */
 
 AC_CommandIndex_enum AC_GetLastReceivedCommand(void)
 {
@@ -35,6 +37,16 @@ AC_CommandIndex_enum AC_GetLastReceivedCommand(void)
 void AC_ClearLastReceivedCommand(void)
 {
     AC_LastReceivedCommand_e = AC_CMD_NONE_e;
+}
+
+boolean AC_GetServiceModeActive(void)
+{
+    return s_AC_ServiceModeActive_b;
+}
+
+void AC_SetServiceModeActive(boolean active_b)
+{
+    s_AC_ServiceModeActive_b = active_b;
 }
 
 /**
@@ -50,11 +62,20 @@ void AC_ManualControlInit(void)
     /* SB3 - Button2 */
     GpioCtrlRegs.GPBDIR.bit.GPIO41 = 0;     /* Pin as input. */
     GpioCtrlRegs.GPBPUD.bit.GPIO41 = 0;     /* Enable internal pull up. */
+
+    GpioCtrlRegs.GPBDIR.bit.GPIO42 = 0;     /* Pin as input. */
+    GpioCtrlRegs.GPBPUD.bit.GPIO42 = 0;     /* Enable internal pull up. */
+
+    /* SB5 - Button4 */
+    GpioCtrlRegs.GPBDIR.bit.GPIO43 = 0;     /* Pin as input. */
+    GpioCtrlRegs.GPBPUD.bit.GPIO43 = 0;     /* Enable internal pull up. */
     EDIS;
 }
 
 AC_BtnDebounce_struct AC_Btn1Debounce_s = {0};
 AC_BtnDebounce_struct AC_Btn2Debounce_s = {0};
+AC_BtnDebounce_struct AC_Btn3Debounce_s = {0};
+AC_BtnDebounce_struct AC_Btn4Debounce_s = {0};
 
 U16 AC_BtnDebounce_U16(AC_BtnDebounce_struct* debounce_ps, boolean current_state_b)
 {
@@ -97,32 +118,52 @@ U16 AC_BtnDebounce_U16(AC_BtnDebounce_struct* debounce_ps, boolean current_state
 
 void AC_ManualControlHandler(void)
 {
-    // AC_BTN1_PRESSED_b = (AC_BtnDebounce_U16(&AC_Btn1Debounce_s, AC_BTN1_PRESSED_db));
-    // AC_BTN2_PRESSED_b = (AC_BtnDebounce_U16(&AC_Btn2Debounce_s, AC_BTN2_PRESSED_db));
+    /* Button 3: toggle service mode (independent of BTN1/BTN2) */
+    AC_BTN3_PRESSED_b = AC_BtnDebounce_U16(&AC_Btn3Debounce_s, AC_BTN3_PRESSED_db);
+    if (AC_BTN3_PRESSED_b == DEBOUNCE_RISING_EDGE_e)
+    {
+        AC_Btn3Debounce_s.was_pressed_b = True_b;
+    }
+    if (AC_Btn3Debounce_s.was_pressed_b && AC_BTN3_PRESSED_b == DEBOUNCE_FALLING_EDGE_e)
+    {
+        AC_Btn3Debounce_s.was_pressed_b = False_b;
+        s_AC_ServiceModeActive_b = !s_AC_ServiceModeActive_b;
+    }
+
+    /* Button 4: toggle FOC enable/disable (independent of other buttons) */
+    AC_BTN4_PRESSED_b = AC_BtnDebounce_U16(&AC_Btn4Debounce_s, AC_BTN4_PRESSED_db);
+    if (AC_BTN4_PRESSED_b == DEBOUNCE_RISING_EDGE_e)
+    {
+        AC_Btn4Debounce_s.was_pressed_b = True_b;
+    }
+    if (AC_Btn4Debounce_s.was_pressed_b && AC_BTN4_PRESSED_b == DEBOUNCE_FALLING_EDGE_e)
+    {
+        AC_Btn4Debounce_s.was_pressed_b = False_b;
+        FOC_SetEnableState(!FOC_GetEnableState());
+    }
+
+    /* Buttons 1 & 2: manual position control */
+    AC_BTN1_PRESSED_b = (AC_BtnDebounce_U16(&AC_Btn1Debounce_s, AC_BTN1_PRESSED_db));
+    AC_BTN2_PRESSED_b = (AC_BtnDebounce_U16(&AC_Btn2Debounce_s, AC_BTN2_PRESSED_db));
 
     /* No action if both pressed or both not pressed */
-    // if (AC_BTN1_PRESSED_b == AC_BTN2_PRESSED_b)
-    // {
-    //     s_AC_BTNManualControl_s.any_button_pressed_b = False_b;
-    // }
-    
-    if (AC_BtnDebounce_U16(&AC_Btn1Debounce_s, AC_BTN1_PRESSED_db) == DEBOUNCE_RISING_EDGE_e)
-    {
-        // MTCL_SetReferencePosition(MDA_GetData_ps()->angular_position__rad__F32 + 0.058448f);
-        s_AC_BTNManualControl_s.BTN_ReferencePosition__rad__F32 = MDA_GetData_ps()->angular_position__rad__F32 + 0.058448f;
-        s_AC_BTNManualControl_s.any_button_pressed_b = True_b;
-    }
-    else if (AC_BtnDebounce_U16(&AC_Btn2Debounce_s, AC_BTN2_PRESSED_db) == DEBOUNCE_RISING_EDGE_e)
-    {
-        // MTCL_SetReferencePosition(MDA_GetData_ps()->angular_position__rad__F32 - 0.058448f);
-        s_AC_BTNManualControl_s.BTN_ReferencePosition__rad__F32 = MDA_GetData_ps()->angular_position__rad__F32 - 0.058448f;
-        s_AC_BTNManualControl_s.any_button_pressed_b = True_b;
-    }
-    else
+    if (AC_BTN1_PRESSED_b == AC_BTN2_PRESSED_b)
     {
         s_AC_BTNManualControl_s.any_button_pressed_b = False_b;
     }
-    
+    else
+    {
+        if (AC_BTN1_PRESSED_b == DEBOUNCE_RISING_EDGE_e)
+        {
+            s_AC_BTNManualControl_s.BTN_ReferencePosition__rad__F32 = MDA_GetData_ps()->angular_position__rad__F32 + 0.058448f;
+            s_AC_BTNManualControl_s.any_button_pressed_b = True_b;
+        }
+        else if (AC_BTN2_PRESSED_b == DEBOUNCE_RISING_EDGE_e)
+        {
+            s_AC_BTNManualControl_s.BTN_ReferencePosition__rad__F32 = MDA_GetData_ps()->angular_position__rad__F32 - 0.058448f;
+            s_AC_BTNManualControl_s.any_button_pressed_b = True_b;
+        }
+    }
 }
 
 inline const AC_BTNManualControl_struct* AC_GetBTNData_ps(void)
@@ -305,7 +346,7 @@ static void AC_CMD_ResetErrorFlags( const void* const payload_p,
         *response_data_size_pU16 = 1;
         return;
     }
-    // MTCL_ResetErrorFlags();
+    MTCL_ResetErrorFlags();
     AC_Reset_ErrorFlags_b = True_b;
     response_data_pU16[0] = RESPONSE_OK_e;
     *response_data_size_pU16 = 1;
@@ -325,6 +366,38 @@ static void AC_CMD_SetMovmentEnableState( const void* const payload_p,
     FOC_SetEnableState(((U16*)payload_p)[0]);
     response_data_pU16[0] = RESPONSE_OK_e;
     *response_data_size_pU16 = 1;
+}
+
+static void AC_CMD_GetFocState( const void* const payload_p,
+                                const U16 payload_size_U16,
+                                U16 * response_data_pU16,
+                                U16 * response_data_size_pU16)
+{
+    if(payload_size_U16 != 0)
+    {
+        response_data_pU16[0] = INVALID_INPUT_e;
+        *response_data_size_pU16 = 1;
+        return;
+    }
+    response_data_pU16[0] = RESPONSE_OK_e;
+    response_data_pU16[1] = (U16)FOC_GetEnableState();
+    *response_data_size_pU16 = 2;
+}
+
+static void AC_CMD_GetServiceMode( const void* const payload_p,
+                                   const U16 payload_size_U16,
+                                   U16 * response_data_pU16,
+                                   U16 * response_data_size_pU16)
+{
+    if(payload_size_U16 != 0)
+    {
+        response_data_pU16[0] = INVALID_INPUT_e;
+        *response_data_size_pU16 = 1;
+        return;
+    }
+    response_data_pU16[0] = RESPONSE_OK_e;
+    response_data_pU16[1] = (U16)AC_GetServiceModeActive();
+    *response_data_size_pU16 = 2;
 }
 
 /**

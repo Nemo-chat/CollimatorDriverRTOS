@@ -72,11 +72,5 @@
 #define INCLUDE_vTaskDelay                  1
 #define INCLUDE_uxTaskGetStackHighWaterMark 1
 
-//#ifndef UINT8_MAX
-//#define UINT8_MAX 0xFFFFu  // because uint8_t is 16-bit on C28x
-//#endif
-//
-//#include "trcRecorder.h"
-
 #endif /* FREERTOS_CONFIG_H */
 

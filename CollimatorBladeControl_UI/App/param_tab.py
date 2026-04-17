@@ -5,6 +5,8 @@ from App.custom_elements import ParamField
 from Communication.Protocol import *
 from App.global_vars import serial_handler
 param_tab_el = None
+save_btn_ref = None
+service_mode_label_ref = None
 
 parameters_strings = {
     'max_speed': None,
@@ -47,8 +49,8 @@ def load_cmd_callback(data):
                                                                                                     resp_dec.payload[1:])
         for key in parameters_strings:
             parameters_strings[key].set(str(parameters[key] / 1000))
-    except:
-        pass
+    except Exception as e:
+        print(f'[LOAD_PARAMS] Response error: {e}, raw data ({len(data)}B): {data.hex() if data else "empty"}')
 
 def load_cmd():
     global parameters
@@ -71,11 +73,16 @@ def parameter_tab(root):
     btn_frame.grid(row=1, column=0, sticky='NSEW')
     btn_frame.columnconfigure(0, weight=1)
 
-    load_btn = Button(btn_frame, text='Load', command=load_cmd)
-    load_btn.grid(row=0, column=1)
+    global service_mode_label_ref
+    service_mode_label_ref = Label(btn_frame, text='', fg='red', font=('Verdana', 10, 'bold'))
+    service_mode_label_ref.grid(row=0, column=0, columnspan=3, sticky='W')
 
-    save_btn = Button(btn_frame, text='Save', command=save_cmd)
-    save_btn.grid(row=0, column=2)
+    load_btn = Button(btn_frame, text='Load', command=load_cmd)
+    load_btn.grid(row=1, column=1)
+
+    global save_btn_ref
+    save_btn_ref = Button(btn_frame, text='Save', command=save_cmd)
+    save_btn_ref.grid(row=1, column=2)
 
     param_grp1 = ttk.LabelFrame(param_tab_el, text='Movement parameters')
     param_grp1.grid(row=0, column=0, columnspan=2, sticky='NSEW')

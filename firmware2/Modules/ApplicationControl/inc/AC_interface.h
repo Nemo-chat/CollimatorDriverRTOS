@@ -35,7 +35,9 @@ typedef enum
     AC_CMD_GET_MOVEMENT_PARAMS_e = 4,
     AC_CMD_GET_MECHANICAL_DATA_e = 5,
     AC_CMD_GET_ELECTRICAL_DATA_e = 6,
-    AC_CMD_GET_MAXIMUM_POSITION_e = 7
+    AC_CMD_GET_MAXIMUM_POSITION_e = 7,
+    AC_CMD_GET_FOC_STATE_e = 8,
+    AC_CMD_GET_SERVICE_MODE_e = 9
 } AC_CommandIndex_enum;
 
 extern AC_CommandIndex_enum AC_LastReceivedCommand_e;
@@ -49,6 +51,9 @@ void AC_ExecuteCommand( const U16 * const command_payload_pU16,
 
 AC_CommandIndex_enum AC_GetLastReceivedCommand(void);
 void AC_ClearLastReceivedCommand(void);
+
+boolean AC_GetServiceModeActive(void);
+void AC_SetServiceModeActive(boolean active_b);
 
 void AC_ManualControlInit(void);
 void AC_ManualControlHandler(void);

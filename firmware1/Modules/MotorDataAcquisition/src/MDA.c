@@ -45,11 +45,11 @@ static inline void MDA_AdcInit(interrupt void (*adc_isr)(void))
     CpuSysRegs.PCLKCR13.bit.ADC_C       = (U16)1;                                   /* Enable ADCC clock. */
     CpuSysRegs.PCLKCR13.bit.ADC_D       = (U16)1;                                   /* Enable ADCD clock. */
     
-    /* Prescaling clocks -> ADC_CLK = CPU_CLK / 2 = 100 MHz. */
-    AdcaRegs.ADCCTL2.bit.PRESCALE       = (U16)2;
-    AdcbRegs.ADCCTL2.bit.PRESCALE       = (U16)2;
-    AdccRegs.ADCCTL2.bit.PRESCALE       = (U16)2;
-    AdcdRegs.ADCCTL2.bit.PRESCALE       = (U16)2;
+    /* Prescaling clocks -> ADC_CLK = CPU_CLK / 4 = 50 MHz. */
+    AdcaRegs.ADCCTL2.bit.PRESCALE       = (U16)6;
+    AdcbRegs.ADCCTL2.bit.PRESCALE       = (U16)6;
+    AdccRegs.ADCCTL2.bit.PRESCALE       = (U16)6;
+    AdcdRegs.ADCCTL2.bit.PRESCALE       = (U16)6;
 
     /* 12 or 16 bit resolution. */
     AdcaRegs.ADCCTL2.bit.RESOLUTION     = (U16)0;
@@ -63,39 +63,39 @@ static inline void MDA_AdcInit(interrupt void (*adc_isr)(void))
     AdcdRegs.ADCCTL2.bit.SIGNALMODE     = (U16)0; // single ended (default value)
 
     AdcaRegs.ADCCTL1.bit.INTPULSEPOS    = (U16)1;
+        
+    /* Channel ADCINA0 - Phase U current measurement. */
+    AdcaRegs.ADCSOC0CTL.bit.CHSEL       = (U16)0;                                   /* ADCIN0 */
+    AdcaRegs.ADCSOC0CTL.bit.TRIGSEL     = (U16)0x09;                                /* ADCTRIG9 - ePWM3, ADCSOCA */
+    AdcaRegs.ADCSOC0CTL.bit.ACQPS       = MDA_ADC_CURRENT_MEASUREMENT_WINDOWS_dU16; /* Sample current 59 ADC clocks. */
+    
+    /* Channel ADCINB1 - Phase V current measurement. */
+    AdcbRegs.ADCSOC0CTL.bit.CHSEL       = (U16)1;                                   /* ADCIN1 */
+    AdcbRegs.ADCSOC0CTL.bit.TRIGSEL     = (U16)0x09;                                /* ADCTRIG9 - ePWM3, ADCSOCA */
+    AdcbRegs.ADCSOC0CTL.bit.ACQPS       = MDA_ADC_CURRENT_MEASUREMENT_WINDOWS_dU16; /* Sample current 59 ADC clocks. */
+    
+    /* Channel ADCINC2 - Phase W current measurement. */
+    AdccRegs.ADCSOC0CTL.bit.CHSEL       = (U16)2;                                   /* ADCIN2 */
+    AdccRegs.ADCSOC0CTL.bit.TRIGSEL     = (U16)0x09;                                /* ADCTRIG9 - ePWM3, ADCSOCA */
+    AdccRegs.ADCSOC0CTL.bit.ACQPS       = MDA_ADC_CURRENT_MEASUREMENT_WINDOWS_dU16; /* Sample current 59 ADC clocks. */
+    
+    /* Channel ADCIND0 - DC link voltage measurement. */
+    AdcdRegs.ADCSOC0CTL.bit.CHSEL       = (U16)0;                                   /* ADCIN0 */
+    AdcdRegs.ADCSOC0CTL.bit.TRIGSEL     = (U16)0x09;                                /* ADCTRIG9 - ePWM3, ADCSOCA */
+    AdcdRegs.ADCSOC0CTL.bit.ACQPS       = MDA_ADC_CURRENT_MEASUREMENT_WINDOWS_dU16; /* Sample current 59 ADC clocks. */
+    
+    /* Interrupt setup. */
+    AdcaRegs.ADCINTSEL1N2.bit.INT1E     = (U16)1;                                   /* Enable interrupt 1. */
+    AdcaRegs.ADCINTSEL1N2.bit.INT1SEL   = (U16)0;                                   /* Setting end of conversion 1 to interrupt source. */
+    AdcaRegs.ADCINTFLGCLR.bit.ADCINT1   = (U16)1;                                   /* Clear ADC INT 1 flag. */
 
     /* Enable power to ADCs. */
     AdcaRegs.ADCCTL1.bit.ADCPWDNZ       = (U16)1;
     AdcbRegs.ADCCTL1.bit.ADCPWDNZ       = (U16)1;
     AdccRegs.ADCCTL1.bit.ADCPWDNZ       = (U16)1;
     AdcdRegs.ADCCTL1.bit.ADCPWDNZ       = (U16)1;
-
+    
     DELAY_US(MDA_ADC_STARTUP_DELAY__us__U32);                                       /* Wait for ADC power up. */
-
-    /* Channel ADCINA0 - Phase U current measurement. */
-    AdcaRegs.ADCSOC0CTL.bit.CHSEL       = (U16)0;                                   /* ADCIN0 */
-    AdcaRegs.ADCSOC0CTL.bit.TRIGSEL     = (U16)0x09;                                /* ADCTRIG9 - ePWM3, ADCSOCA */
-    AdcaRegs.ADCSOC0CTL.bit.ACQPS       = MDA_ADC_CURRENT_MEASUREMENT_WINDOWS_dU16; /* Sample current 20 ADC clocks. */
-
-    /* Channel ADCINB1 - Phase V current measurement. */
-    AdcbRegs.ADCSOC0CTL.bit.CHSEL       = (U16)1;                                   /* ADCIN1 */
-    AdcbRegs.ADCSOC0CTL.bit.TRIGSEL     = (U16)0x09;                                /* ADCTRIG9 - ePWM3, ADCSOCA */
-    AdcbRegs.ADCSOC0CTL.bit.ACQPS       = MDA_ADC_CURRENT_MEASUREMENT_WINDOWS_dU16; /* Sample current 20 ADC clocks. */
-
-    /* Channel ADCINC2 - Phase W current measurement. */
-    AdccRegs.ADCSOC0CTL.bit.CHSEL       = (U16)2;                                   /* ADCIN2 */
-    AdccRegs.ADCSOC0CTL.bit.TRIGSEL     = (U16)0x09;                                /* ADCTRIG9 - ePWM3, ADCSOCA */
-    AdccRegs.ADCSOC0CTL.bit.ACQPS       = MDA_ADC_CURRENT_MEASUREMENT_WINDOWS_dU16; /* Sample current 20 ADC clocks. */
-
-    /* Channel ADCIND0 - DC link voltage measurement. */
-    AdcdRegs.ADCSOC0CTL.bit.CHSEL       = (U16)0;                                   /* ADCIN0 */
-    AdcdRegs.ADCSOC0CTL.bit.TRIGSEL     = (U16)0x09;                                /* ADCTRIG9 - ePWM3, ADCSOCB */
-    AdcdRegs.ADCSOC0CTL.bit.ACQPS       = MDA_ADC_CURRENT_MEASUREMENT_WINDOWS_dU16; /* Sample current 20 ADC clocks. */
-
-    /* Interrupt setup. */
-    AdcaRegs.ADCINTSEL1N2.bit.INT1E     = (U16)1;                                   /* Enable interrupt 1. */
-    AdcaRegs.ADCINTSEL1N2.bit.INT1SEL   = (U16)0;                                   /* Setting end of conversion 1 to interrupt source. */
-    AdcaRegs.ADCINTFLGCLR.bit.ADCINT1   = (U16)1;                                   /* Clear ADC INT 1 flag. */
 
     DINT;                                                                           /* Globally disable interrupts. */
     PieCtrlRegs.PIECTRL.bit.ENPIE       = (U16)1;                                   /* Enable interrupt vector table peripheral. */

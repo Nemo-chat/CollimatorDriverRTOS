@@ -104,9 +104,9 @@ def application_data_recieved(data):
             torque_error_toplevel.destroy()
 
         set_transaction_lock(False)
-    except:
+    except Exception as e:
+        print(f'[HELLO] Response error: {e}, raw data ({len(data)}B): {data.hex() if data else "empty"}')
         set_transaction_lock(True)
-        pass
 
 
 def clear_error_transaction_callback(data):
@@ -118,8 +118,8 @@ def clear_error_transaction_callback(data):
             torque_error_toplevel_active = False
             torque_error_toplevel.grab_release()
             torque_error_toplevel.destroy()
-    except:
-        pass
+    except Exception as e:
+        print(f'[CLEAR_ERR] Response error: {e}, raw data ({len(data)}B): {data.hex() if data else "empty"}')
 
 
 def command_clear_error():
