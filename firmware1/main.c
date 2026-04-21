@@ -140,7 +140,7 @@ void vApplicationStackOverflowHook( TaskHandle_t xTask, char *pcTaskName )
  */
 interrupt void MDA_AdcConverstionCompleteIsr(void)
 {
-    GpioDataRegs.GPCSET.bit.GPIO77 = 1;
+    // GpioDataRegs.GPCSET.bit.GPIO77 = 1;
 
     ctrInterruptEvent++;
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
@@ -149,7 +149,7 @@ interrupt void MDA_AdcConverstionCompleteIsr(void)
     AdcaRegs.ADCINTFLGCLR.bit.ADCINT1   = (U16)1;                                  
     PieCtrlRegs.PIEACK.bit.ACK1         = (U16)1;
     
-    GpioDataRegs.GPCCLEAR.bit.GPIO77 = 1;
+    // GpioDataRegs.GPCCLEAR.bit.GPIO77 = 1;
 
     if (xHigherPriorityTaskWoken == pdTRUE)
     {
@@ -184,6 +184,7 @@ void main(void)
     TrackGPIOsInit();
 
     // Configure the shared memory GS11 and GS15 to be accessible by CPU2
+    // Select GS11 to be shared between CPU1 and CPU2 (CPU2 can access it, but CPU1 cannot)
     EALLOW;
     MemCfgRegs.GSxMSEL.bit.MSEL_GS11 = 1;
     MemCfgRegs.GSxMSEL.bit.MSEL_GS12 = 1;
@@ -222,7 +223,7 @@ void main(void)
     }
 
     if(xTaskCreate(WriteToSharedMemoryTask_Func, 
-                   (const char *)"WriteToSharedMemoryTask", 
+                   (const char *)"WriteDataToSharedMemoryTask", 
                    WRITE_TO_SHARED_MEMORY_TASK_STACK_SIZE, 
                    NULL,
                    (tskIDLE_PRIORITY + WRITE_TO_SHARED_MEMORY_TASK_PRIORITY), 
@@ -245,13 +246,12 @@ void main(void)
     while(IpcRegs.IPCSTS.bit.IPC17 == 0);
     IpcRegs.IPCACK.bit.IPC17 = 1;
 
-    // Start the scheduler.  This should not return.
+    /*Start the scheduler.*/ 
     vTaskStartScheduler();
 
     /* Main loop */
     for(;;)
     {
-
     }
 }
 
@@ -261,6 +261,7 @@ static void WriteToSharedMemoryTask_Func(void *pvParameters)
     {
         ctrWriteToSharedMemoryTaskHit++;
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        // GpioDataRegs.GPCSET.bit.GPIO77 = 1;
 
         // lockCPU1();
         SharedDataCPU1TOCPU2.mda_data_s = *MDA_GetData_ps();                 // Read updated data from shared memory
@@ -281,6 +282,8 @@ static void WriteToSharedMemoryTask_Func(void *pvParameters)
         vTaskPrioritySet(ProcessOutputTask, 1);
         vTaskPrioritySet(NULL,  1);
         ctrWriteToSharedMemoryTask++;
+        // GpioDataRegs.GPCCLEAR.bit.GPIO77 = 1;
+
     }
 }
 
@@ -293,7 +296,7 @@ static void ProcessInputsTask_Func(void *pvParameters)
     {
         // Wait for the semaphore to be given by the ADC ISR
         xSemaphoreTake(SyncSemaphore, portMAX_DELAY);
-        GpioDataRegs.GPCSET.bit.GPIO70 = 1;
+        // GpioDataRegs.GPCSET.bit.GPIO70 = 1;
         
         ATB_IncrementTime();          
         // Process the inputs and update the data structure with newly acquired data
@@ -305,7 +308,7 @@ static void ProcessInputsTask_Func(void *pvParameters)
         UBaseType_t uxPriority = uxTaskPriorityGet(NULL);        
         vTaskPrioritySet(ApplicationTask,  uxPriority + 1); 
         xTaskNotifyGive(ApplicationTask); // Notify the Application Task that new data is available
-        GpioDataRegs.GPCCLEAR.bit.GPIO70 = 1;
+        // GpioDataRegs.GPCCLEAR.bit.GPIO70 = 1;
         taskYIELD(); // Yield to allow Application Task to run immediately after processing inputs
 
     }
@@ -324,7 +327,7 @@ static void ApplicationTask_Func(void *pvParameters)
         ulEventToProcess = ulTaskNotifyTake( pdTRUE, portMAX_DELAY );
         if (ulEventToProcess != 0)
         {   
-            GpioDataRegs.GPCSET.bit.GPIO72 = 1;
+            // GpioDataRegs.GPCSET.bit.GPIO72 = 1;
             // Set reference position from button control if any button is pressed
             if (AC_GetBTNData_ps()->any_button_pressed_b)
             {
@@ -348,9 +351,9 @@ static void ApplicationTask_Func(void *pvParameters)
             
             // Increment the execution counter
             ctrApplicationTask++;
-            GpioDataRegs.GPCCLEAR.bit.GPIO72 = 1;
+            // GpioDataRegs.GPCCLEAR.bit.GPIO72 = 1;
             UBaseType_t uxPriority = uxTaskPriorityGet(NULL);        
-            vTaskPrioritySet(ProcessOutputTask,  uxPriority + 1); 
+            vTaskPrioritySet(ProcessOutputTask,  uxPriority + 3); 
      
             taskYIELD();
         }
@@ -365,7 +368,7 @@ static void ProcessOutputTask_Func(void *pvParameters)
         ulEventToProcess = ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
         if (ulEventToProcess != 0)
         {   
-            GpioDataRegs.GPCSET.bit.GPIO74 = 1;
+            // GpioDataRegs.GPCSET.bit.GPIO74 = 1;
             /* Apply compare values from global buffer */
             PWM_SetCompareValues(g_PWM_CompareValues.cmp_u,
                                  g_PWM_CompareValues.cmp_v,
@@ -373,7 +376,7 @@ static void ProcessOutputTask_Func(void *pvParameters)
             // PWM_SetCompareValues(0.0, 0.0, 0.0);
 
             ctrProcessOutputTask++;
-            GpioDataRegs.GPCCLEAR.bit.GPIO74 = 1;
+            // GpioDataRegs.GPCCLEAR.bit.GPIO74 = 1;
             UBaseType_t uxPriority = uxTaskPriorityGet(NULL);        
             vTaskPrioritySet(WriteToSharedMemoryTask,  uxPriority + 1); 
             taskYIELD();
@@ -412,15 +415,15 @@ void getDataFromCPU2(void)
 
 __interrupt void ipc2_isr_cpu2(void)
 {
+    GpioDataRegs.GPCSET.bit.GPIO77 = 1;
     ctrInterruptEventIPC2_from_CPU2++;
-    // TrackGPIO_Set(ISR_IPC_CPU2);
 
     getDataFromCPU2(); // Read the command and data sent by CPU2 and update control parameters accordingly
     // Clear the IPC interrupt flag
     IpcRegs.IPCACK.bit.IPC2 = 1;                // Clear the IPC2 interrupt flag
     PieCtrlRegs.PIEACK.bit.ACK1 = 1;			// Must acknowledge the PIE group
 
-    // TrackGPIO_Clear(ISR_IPC_CPU2);
+    GpioDataRegs.GPCCLEAR.bit.GPIO77 = 1;
 
     portYIELD_FROM_ISR(pdTRUE);
 

@@ -31,8 +31,9 @@
 
 /* Motor parameters. */
 #define MOTOR_POLE_PAIRS_dU16                           ( (U16)4 )              /**< Number of motor pole pairs. */
-#define MOTOR_LINEAR_TRANN_TRANSFER__rev_mm1__dF32      ( (F32)10 )             /**< Not used */
-
+#define MOTOR_ENCODER_RADIUS__mm__dF32                  ( (F32)2.5 )            /**< Radius of encoder disk. */
+#define MOTOR_LINEAR_TRANN_TRANSFER__rev_mm1__dF32      ( (F32) MOTOR_ENCODER_RADIUS__mm__dF32 * TWO_PI_dF32 )             /**< Not used */
+#define MOTOR_GEAR_RATIO_dF32                           ( (F32)7.5 )            /**< Gear ratio of the motor. */
 /* Speed and position defines. */
 #define MDA_ENC_CPR_dU16                                ( (U16)4096 )           /* Encoder counts per revolution. */
 

@@ -39,11 +39,18 @@
 
 
 // Macro to define priorities of individual tasks
-#define COM_TASK_PRIORITY   1
-#define PRINT_TASK_PRIORITY   1
-#define WRITE_COMMAND_TO_SHARED_MEMORY_TASK_PRIORITY   2
+#define PRINT_TASK_PRIORITY                            1
+#define COMMUNICATION_TASK_PRIORITY                    2
+#define WRITE_COMMAND_TO_SHARED_MEMORY_TASK_PRIORITY   3
 
 #define STACK_SIZE  256U
+
+// #define PINS_MASK  ((1UL << 6) | (1UL << 8) | (1UL << 10) | (1UL << 13)) /* GPIO70, GPIO72, GPIO74, GPIO77 */
+
+// uint32_t ActivePins = 0; 
+
+uint32_t ClearBitOnRegister();
+void SetBitOnRegister(uint32_t pins);
 
 typedef struct
 {
@@ -126,7 +133,6 @@ void vApplicationStackOverflowHook( TaskHandle_t xTask, char *pcTaskName )
     while(1);
 }
 
-__interrupt void ipc_isr_cpu1(void);
 __interrupt void ipc3_isr_cpu1(void);
 
 void main(void)
@@ -134,7 +140,7 @@ void main(void)
     /* Initialization */
     Interrupt_initModule();       // Need reveiw if it neccessary
     Interrupt_initVectorTable();  // Need reveiw if it neccessary
-    IPC_ISRvInit_CPU2(&ipc_isr_cpu1, &ipc3_isr_cpu1);          // Initialize IPC ISRs for CPU2
+    IPC_ISRvInit_CPU2(&ipc3_isr_cpu1);          // Initialize IPC ISRs for CPU2
     spi_vInit(800000);
     dispCtrl_vInitDisplay();
     ATB_Init();
@@ -145,7 +151,7 @@ void main(void)
                    (const char *)"CommunicationTask", 
                    COM_TASK_STACK_SIZE, 
                    NULL,
-                   (tskIDLE_PRIORITY + COM_TASK_PRIORITY), 
+                   (tskIDLE_PRIORITY + COMMUNICATION_TASK_PRIORITY), 
                    &CommunicationTask) != pdTRUE)
     {
         ESTOP0;
@@ -193,10 +199,11 @@ static void CommunicationTask_Func(void *pvParameters)
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
     
+    uint32_t local_active_pins = 0;
     for(;;)
     {
-        // TrackGPIO_Set(CommunicationTaskTrack);
-        
+        local_active_pins = ClearBitOnRegister();
+        GpioDataRegs.GPCSET.bit.GPIO70 = 1;
         ECOM_MainHandler();        
 
         if ((AC_GetLastReceivedCommand() < AC_CMD_GET_MOVEMENT_PARAMS_e) && !AC_GetServiceModeActive()) // If the received command is a control command and service mode is not active, notify WriteCommandToSharedMemoryTask to write the command to shared memory for CPU2 to read and execute
@@ -209,7 +216,9 @@ static void CommunicationTask_Func(void *pvParameters)
 
         // Increment the execution counter
         ctrCommunicationTask++;
-        // TrackGPIO_Clear(CommunicationTaskTrack);
+        GpioDataRegs.GPCCLEAR.bit.GPIO70 = 1;
+        SetBitOnRegister(local_active_pins);
+
         vTaskDelayUntil( &xLastWakeTime, pdMS_TO_TICKS( 1 ) );
     }
 }
@@ -224,30 +233,32 @@ static void PrintTask_Func(void *pvParameters)
 
     for(;;)
     {
-        // TrackGPIO_Set(PrintTaskTrack);
-        elapsedTime = (float)(CpuTimer1Regs.PRD.all - CpuTimer1Regs.TIM.all) * 0.005; 
+        GpioDataRegs.GPCSET.bit.GPIO72 = 1;
         DisplayRefresh();
         
         // Increment the execution counter
         ctrPrintTask++;
 
-        CpuTimer1Regs.TCR.bit.TRB = 1;
-        // TrackGPIO_Clear(PrintTaskTrack);
+        GpioDataRegs.GPCCLEAR.bit.GPIO72 = 1;
         vTaskDelayUntil( &xLastWakeTime, pdMS_TO_TICKS( 100 ) );
     }
 }
 
 static void WriteCommandToSharedMemoryTask_Func(void *pvParameters)
 {
+    uint32_t local_active_pins = 0;
     for(;;)
     {
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY); // Wait until notified by Communication Task about new command to write to shared memory
-        // TrackGPIO_Set(WriteCommandToSharedMemoryTaskTrack);
+        local_active_pins = ClearBitOnRegister();
+        GpioDataRegs.GPCSET.bit.GPIO74 = 1;
         setDataToCPU1(AC_GetLastReceivedCommand()); // Write the command and relevant data to shared memory for CPU2 to read
 
         // Increment the execution counter
         ctrWriteCommandToSharedMemoryTask++;
-        // TrackGPIO_Clear(WriteCommandToSharedMemoryTaskTrack);
+        GpioDataRegs.GPCCLEAR.bit.GPIO74 = 1;
+        SetBitOnRegister(local_active_pins);
+        // taskYIELD(); // Yield to allow other tasks to run immediately after writing command to shared memory
     }
 }
 
@@ -295,7 +306,9 @@ void setDataToCPU1(AC_CommandIndex_enum received_cmd)
 
 __interrupt void ipc3_isr_cpu1(void)
 {
-    // TrackGPIO_Set(ISR_IPC_CPU1);
+    uint32_t local_active_pins = ClearBitOnRegister();
+
+    GpioDataRegs.GPCSET.bit.GPIO77 = 1;
     MDA_SetData(&SharedDataCPU1TOCPU2.mda_data_s);         // Update MDA data in shared structure
     MTCL_SetMovementParams(SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxSpeed__rad_s__F32,
                             SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxAccel__rad_s2__F32,
@@ -316,49 +329,23 @@ __interrupt void ipc3_isr_cpu1(void)
     PieCtrlRegs.PIEACK.bit.ACK1 = 1;			// Must acknowledge the PIE group
     ctrReadDataFromSharedMemoryISR++;
     
-    // TrackGPIO_Clear(ISR_IPC_CPU1);
+    GpioDataRegs.GPCCLEAR.bit.GPIO77 = 1;
+    SetBitOnRegister(local_active_pins);
+
     portYIELD_FROM_ISR(pdTRUE);
 }
 
-__interrupt void ipc_isr_cpu1(void)
+uint32_t ClearBitOnRegister()
 {
-    ctrInterruptEventIPC_from_CPU1++;
-    
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    // Notify the Communication Task that new data is available from CPU1
-    //vTaskNotifyGiveFromISR(ReadFromSharedMemoryTask, &xHigherPriorityTaskWoken);
+    uint32_t local_active_pins = GpioDataRegs.GPCDAT.all; // Read the current state of the pins and store it in ActivePins variable
 
-    // Clear the IPC interrupt flag
-    IpcRegs.IPCCLR.bit.IPC1 = 1;                // Clear the IPC1 interrupt flag
-    PieCtrlRegs.PIEACK.bit.ACK1 = 1;			// Must acknowledge the PIE group
- 
-    if (xHigherPriorityTaskWoken == pdTRUE)
-    {
-        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-    }
+    GpioDataRegs.GPCCLEAR.all = local_active_pins;
+    return local_active_pins;
 }
 
-void lockCPU2(void)
+void SetBitOnRegister(uint32_t pins)
 {
-    while(1)
-    {
-        if(IpcRegs.IPCSTS.bit.IPC0 == 0)
-        {
-            IpcRegs.IPCSET.bit.IPC0 = 1;
-
-            if(IpcRegs.IPCFLG.bit.IPC0 == 1)
-            {
-                return; 
-            }
-        }
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-    }
-}
-
-void unlockCPU2(void)
-{
-    IpcRegs.IPCCLR.bit.IPC0 = 1;
-    IpcRegs.IPCSET.bit.IPC1 = 1; 
+    GpioDataRegs.GPCSET.all = pins;
 }
 
 /**

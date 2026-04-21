@@ -213,7 +213,7 @@ inline void MDA_UpdateData(void)
     s_MDA_data_s.angular_position__rad__F32 = (F32)( ( (F32)s_MDA_data_s.linear_position_enc_counter_U32 / (F32)MDA_ENC_CPR_dU16 ) * TWO_PI_dF32 );
 
     /* Linear position calculation. */
-    s_MDA_data_s.linear_position__mm__F32 = ((F32)s_MDA_data_s.linear_position_enc_counter_U32 / (F32)MDA_ENC_CPR_dU16) * MOTOR_LINEAR_TRANN_TRANSFER__rev_mm1__dF32;
+    s_MDA_data_s.linear_position__mm__F32 = ((F32)s_MDA_data_s.linear_position_enc_counter_U32 / (F32)MDA_ENC_CPR_dU16) * MOTOR_LINEAR_TRANN_TRANSFER__rev_mm1__dF32 * MOTOR_GEAR_RATIO_dF32;
 
     /* Write calculated phase current value from ADC conversions. */
 

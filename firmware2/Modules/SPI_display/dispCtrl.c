@@ -239,7 +239,6 @@ void DisplayRefresh(void)
         dispCtrl_vSetPosition(14,3);
         dispCtrl_u16PutString(" ON");
     }
-
     else
     {
         dispCtrl_vSetPosition(1,3);

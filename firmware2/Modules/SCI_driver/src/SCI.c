@@ -12,15 +12,14 @@ void SCI_PinsInit(void)
     /* SCIRXDA */
     GpioCtrlRegs.GPAGMUX2.bit.GPIO28 = 0;
     GpioCtrlRegs.GPAMUX2.bit.GPIO28 = 1;
-    GpioCtrlRegs.GPACSEL4.bit.GPIO28 = 2; // select master core CPU2
-
+    
     /* SCITXDA */
     GpioCtrlRegs.GPAGMUX2.bit.GPIO29 = 0;
     GpioCtrlRegs.GPAMUX2.bit.GPIO29 = 1;
-    GpioCtrlRegs.GPACSEL4.bit.GPIO29 = 2; // select master core CPU2
 
-    DevCfgRegs.CPUSEL5.bit.SCI_A = 1;     // 0 = CPU1 owner, 1 = CPU2 owner
-
+    GpioCtrlRegs.GPACSEL4.bit.GPIO28 = 2; // SCI_A RX pin - select master core CPU2
+    GpioCtrlRegs.GPACSEL4.bit.GPIO29 = 2; // SCI_A TX pin - select master core CPU2
+    DevCfgRegs.CPUSEL5.bit.SCI_A = 1;     // SCI_A owned by CPU2
     EDIS;
 }
 void SCI_Init(void)

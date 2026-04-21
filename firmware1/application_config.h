@@ -9,11 +9,4 @@
 #define APPLICATION_CONFIG_H_
 
 
-/* Motor parameters */
-
-/**/
-
-
-
-
 #endif /* APPLICATION_CONFIG_H_ */
