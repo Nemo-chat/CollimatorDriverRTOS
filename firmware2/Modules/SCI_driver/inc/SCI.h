@@ -16,10 +16,8 @@
 #define SCI_TX_BUFF_dM                      ( SciaRegs.SCITXBUF.all )
 
 void SCI_Init(void);
-void SCI_PinsInit(void);
 void SCI_SendData(const U16 * const data_pU16, const U16 n_data_U16);
 void SCI_SetRxEnableState(boolean enabled_b);
 void SCI_SetTxEnableState(boolean enabled_b);
-
 
 #endif /* DRIVERS_SCI_DRIVER_INC_SCI_H_ */

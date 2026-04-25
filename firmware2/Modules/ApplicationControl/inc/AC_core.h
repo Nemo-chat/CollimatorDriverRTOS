@@ -19,28 +19,6 @@
 
 #define AC_CORE_CHECK_INDEX_BOUND_dM_b(idx)   ( idx < (sizeof(AC_Functions) / sizeof(AC_ControlFunction_pF)) )
 
-#define AC_BTN1_PRESSED_db          ( (boolean)!GpioDataRegs.GPCDAT.bit.GPIO70 )    /**< Check if button 1 is pressed. */
-#define AC_BTN2_PRESSED_db          ( (boolean)!GpioDataRegs.GPCDAT.bit.GPIO69 )    /**< Check if button 1 is pressed. */
-
-/* Button debouncing structure. */
-typedef struct
-{
-    U32 rising_edge_ticks_U32;
-    U32 falling_edge_ticks_U32;
-    boolean last_state_b;
-    boolean debounced_state_b;
-} AC_BtnDebounce_struct;
-
-/* Debounced button state. */
-typedef enum
-{
-    DEBOUNCE_NO_CHANGE_e    = 0,
-    DEBOUNCE_RISING_EDGE_e  = 1,
-    DEBOUNCE_FALLING_EDGE_e = 2
-} AC_BtnDebouncedState_enum;
-
-U16 AC_BtnDebounce_U16(AC_BtnDebounce_struct* debounce_ps, boolean current_state_b);
-
 typedef void (*AC_ControlFunction_pF)(const void* const, const U16, U16*, U16*);
 
 /* External communication responses. */

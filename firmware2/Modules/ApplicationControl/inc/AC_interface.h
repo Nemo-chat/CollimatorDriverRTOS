@@ -17,13 +17,6 @@
 #ifndef INC_AC_INTERFACE_H_
 #define INC_AC_INTERFACE_H_
 
-typedef struct 
-{
-    boolean any_button_pressed_b;
-    F32 BTN_ReferencePosition__rad__F32;
-
-}AC_BTNManualControl_struct;
-
 /* Last command received via external communication */
 typedef enum
 {
@@ -54,10 +47,6 @@ void AC_ClearLastReceivedCommand(void);
 
 boolean AC_GetServiceModeActive(void);
 void AC_SetServiceModeActive(boolean active_b);
-
-void AC_ManualControlInit(void);
-void AC_ManualControlHandler(void);
-const AC_BTNManualControl_struct* AC_GetBTNData_ps(void);
 
 #endif /* INC_AC_INTERFACE_H_ */
 

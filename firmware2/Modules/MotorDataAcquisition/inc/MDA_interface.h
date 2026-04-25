@@ -42,12 +42,8 @@ typedef struct
     F32 angular_position__rad__F32;
 } MDA_Data_struct;
 
-void MDA_Init(interrupt void (*adc_isr)(void));
-void MDA_UpdateData(void);
 const MDA_Data_struct* MDA_GetData_ps(void);
 void MDA_SetData(const MDA_Data_struct* new_data_ps);
-void MDA_ResetLinearPosition(void);
-void MDA_CalibratePhaseCurrentsOffsets(void);
 
 #endif /* MODULES_MOTORDATAACQUISITION_INC_MDA_INTERFACE_H_ */
 

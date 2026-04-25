@@ -18,14 +18,6 @@
 #include <app_types.h>
 #include <mcu.h>
 
-// typedef struct
-// {
-//     MDA_Data_struct mda_data_s;
-//     MTCL_Control_struct mtcl_control_s;
-//     boolean foc_enable_state_b;
-
-// }SharedDataCPU1TOCPU2_struct;
-
 void ErrorHandler(void);
 
 #endif /* MAIN_H_ */

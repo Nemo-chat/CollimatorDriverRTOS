@@ -9,9 +9,6 @@
 #define INTERRUPTSERVICEROUTINES_H_
 #include <main.h>
 
-
-void ISR_MotorControlHandler(void);
-
 void IPC_ISRvInit_CPU1(__interrupt void (*ipc2_isr_cpu1)(void));
 void TrackGPIOsInit(void);
 

@@ -56,13 +56,9 @@ boolean MTCL_SetMovementParams(const F32 max_speed__rad_s__F32, const F32 max_ac
 void    MTCL_GetMovementParams(F32 * const max_speed__rad_s__F32, F32 * const max_accel__rad_s2__F32, F32 * const max_torque__Nm__F32);
 boolean MTCL_SetReferencePosition(const F32 new_position__rad__F32);
 F32     MTCL_GetReferencePosition_F32(void);
-void    MTCL_MainHandler();
-void    MTCL_Init(void);
-const   PC_Data_struct* PC_GetData_ps(void);
 const   MTCL_Control_struct* MTCL_GetControlState_ps(void);
 F32     MTCL_GetMaximumPosition_F32(void);
 void    MTCL_SetMaximumPosition_F32(F32* new_max_position__rad__F32);
-void    MTCL_ResetErrorFlags(void);
 
 extern MTCL_Control_struct s_MTCL_Control_s;
 

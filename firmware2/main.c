@@ -19,11 +19,9 @@
 #include <AC_interface.h>
 #include <ECOM_interface.h>
 #include <MDA_interface.h>
-#include <PWM_interface.h>
 #include <SCI.h>
 #include "InterruptServiceRoutines.h"
 #include "FOC.h"
-#include "TEST.h"
 #include <PI_Controller.h>
 #include "spi.h"
 #include "dispCtrl.h"

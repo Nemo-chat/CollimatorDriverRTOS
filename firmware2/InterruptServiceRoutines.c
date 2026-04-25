@@ -7,7 +7,6 @@
 #include <main.h>
 #include <ATB_interface.h>
 #include <MTCL_interface.h>
-#include <TEST.h>
 #include "InterruptServiceRoutines.h"
 
 void IPC_ISRvInit_CPU2(interrupt void (*ipc3_isr_cpu1)(void))

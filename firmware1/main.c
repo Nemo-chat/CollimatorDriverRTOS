@@ -17,7 +17,6 @@
 #include <main.h>
 #include <ATB_interface.h>
 #include <AC_interface.h>
-#include <ECOM_interface.h>
 #include <MDA_interface.h>
 #include <PWM_interface.h>
 #include <SCI.h>
@@ -26,7 +25,6 @@
 #include "TEST.h"
 #include <PI_Controller.h>
 #include "spi.h"
-#include "dispCtrl.h"
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -70,25 +68,10 @@ typedef struct
 // Task handles
 TaskHandle_t ProcessInputTask, ApplicationTask, WriteToSharedMemoryTask, ProcessOutputTask;
 
-// Execution counters
-static volatile uint32_t ctrProcessInputTask = 0;
-static volatile uint32_t ctrApplicationTask = 0;
-static volatile uint32_t ctrInterruptEvent = 0;
-static volatile uint32_t ctrInterruptEventIPC1_from_CPU2 = 0;
-static volatile uint32_t ctrInterruptEventIPC2_from_CPU2 = 0;
-static volatile uint32_t ctrWriteToSharedMemoryTask = 0;
-static volatile uint32_t ctrWriteToSharedMemoryTaskHit = 0;
-static volatile uint32_t ctrProcessOutputTask = 0;
-
 uint8_t ADCInterruptsNumber = 10;
-static volatile float elapsedTime = 0;
-uint32_t startTime = 0;
-uint32_t endTime = 0;
 
 // The Semaphore for synchronization ISR by ADC and Process Inputs Task.
 SemaphoreHandle_t SyncSemaphore;
-// Mutex for shared data access
-SemaphoreHandle_t Mutex; 
 
 // Shared data structure for communication between CPU1 and CPU2
 volatile SharedDataCPU1TOCPU2_struct SharedDataCPU1TOCPU2;
@@ -142,7 +125,6 @@ interrupt void MDA_AdcConverstionCompleteIsr(void)
 {
     // GpioDataRegs.GPCSET.bit.GPIO94 = 1;
 
-    ctrInterruptEvent++;
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     xSemaphoreGiveFromISR(SyncSemaphore, &xHigherPriorityTaskWoken);
 
@@ -164,7 +146,6 @@ void main(void)
 {
     // Create a semaphore.
     SyncSemaphore = xSemaphoreCreateBinary();
-    Mutex = xSemaphoreCreateMutex();
 
     /* Initialization */
     mcu_vInitClocks();                              /* Initialize uC clock system. */
@@ -181,7 +162,6 @@ void main(void)
     FOC_CommutationAlignment();
     MDA_Init(&MDA_AdcConverstionCompleteIsr);
     MTCL_Init();
-    TEST_PinInit();
     MDA_CalibratePhaseCurrentsOffsets();
     AC_ManualControlInit();
     TrackGPIOsInit();
@@ -258,33 +238,6 @@ void main(void)
     }
 }
 
-static void WriteToSharedMemoryTask_Func(void *pvParameters)
-{
-    for(;;)
-    {
-        ctrWriteToSharedMemoryTaskHit++;
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-        GpioDataRegs.GPCSET.bit.GPIO94 = 1;
-
-        SharedDataCPU1TOCPU2.mda_data_s = *MDA_GetData_ps();                 // Read updated data from shared memory
-        SharedDataCPU1TOCPU2.foc_enable_state_b = FOC_GetEnableState();      // Update FOC enable state in shared data
-        SharedDataCPU1TOCPU2.mtcl_control_s = *MTCL_GetControlState_ps();    // Update MTCL control struct in shared data
-        SharedDataCPU1TOCPU2.mtcl_maximum_position_rad_F32 = MTCL_GetMaximumPosition_F32();
-        MTCL_GetMovementParams(&SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxSpeed__rad_s__F32,
-                                    &SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxAccel__rad_s2__F32,
-                                    &SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxTorque__Nm__F32); // Update MTCL movement parameters in shared data
-        SharedDataCPU1TOCPU2.active_service_mode_b = AC_GetServiceModeActive(); // Update service mode state in shared data
-
-        IpcRegs.IPCSET.bit.IPC13 = 1; // Optional entry marker handled in CPU2 ISR
-        IpcRegs.IPCSET.bit.IPC3  = 1; // Main update interrupt to CPU2
-        while(IpcRegs.IPCFLG.bit.IPC13 != 0); // Wait until CPU2 enters ISR and ACKs marker
-        while(IpcRegs.IPCFLG.bit.IPC3  != 0); // Wait until CPU2 completes ISR work and ACKs IPC3
-        
-        ctrWriteToSharedMemoryTask++;
-        GpioDataRegs.GPCCLEAR.bit.GPIO94 = 1;
-
-    }
-}
 
 /**
  * @brief Function for the Process Inputs task.
@@ -303,7 +256,6 @@ static void ProcessInputsTask_Func(void *pvParameters)
         AC_ManualControlHandler(); 
 
         xTaskNotifyGive(ApplicationTask); 
-        ctrProcessInputTask++;
         GpioDataRegs.GPCCLEAR.bit.GPIO79 = 1;
         taskYIELD(); // Yield to allow Application Task to run immediately after processing inputs
 
@@ -337,8 +289,6 @@ static void ApplicationTask_Func(void *pvParameters)
             
             xTaskNotifyGive(ProcessOutputTask);
             
-            // Increment the execution counter
-            ctrApplicationTask++;
             GpioDataRegs.GPCCLEAR.bit.GPIO90 = 1;
             taskYIELD();
         }
@@ -367,10 +317,35 @@ static void ProcessOutputTask_Func(void *pvParameters)
                 xTaskNotifyGive(WriteToSharedMemoryTask);
             }
 
-            ctrProcessOutputTask++;
             GpioDataRegs.GPCCLEAR.bit.GPIO92 = 1;
             taskYIELD();
         }
+    }
+}
+
+static void WriteToSharedMemoryTask_Func(void *pvParameters)
+{
+    for(;;)
+    {
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        GpioDataRegs.GPCSET.bit.GPIO94 = 1;
+
+        SharedDataCPU1TOCPU2.mda_data_s = *MDA_GetData_ps();                 // Read updated data from shared memory
+        SharedDataCPU1TOCPU2.foc_enable_state_b = FOC_GetEnableState();      // Update FOC enable state in shared data
+        SharedDataCPU1TOCPU2.mtcl_control_s = *MTCL_GetControlState_ps();    // Update MTCL control struct in shared data
+        SharedDataCPU1TOCPU2.mtcl_maximum_position_rad_F32 = MTCL_GetMaximumPosition_F32();
+        MTCL_GetMovementParams(&SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxSpeed__rad_s__F32,
+                                    &SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxAccel__rad_s2__F32,
+                                    &SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxTorque__Nm__F32); // Update MTCL movement parameters in shared data
+        SharedDataCPU1TOCPU2.active_service_mode_b = AC_GetServiceModeActive(); // Update service mode state in shared data
+
+        IpcRegs.IPCSET.bit.IPC13 = 1; // Optional entry marker handled in CPU2 ISR
+        IpcRegs.IPCSET.bit.IPC3  = 1; // Main update interrupt to CPU2
+        while(IpcRegs.IPCFLG.bit.IPC13 != 0); // Wait until CPU2 enters ISR and ACKs marker
+        while(IpcRegs.IPCFLG.bit.IPC3  != 0); // Wait until CPU2 completes ISR work and ACKs IPC3
+        
+        GpioDataRegs.GPCCLEAR.bit.GPIO94 = 1;
+
     }
 }
 
@@ -407,7 +382,6 @@ __interrupt void ipc2_isr_cpu2(void)
 {
     GpioDataRegs.GPCSET.bit.GPIO94 = 1;
     IpcRegs.IPCACK.bit.IPC12 = 1;
-    ctrInterruptEventIPC2_from_CPU2++;
 
     getDataFromCPU2(); // Read the command and data sent by CPU2 and update control parameters accordingly
     
