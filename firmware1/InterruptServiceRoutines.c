@@ -26,21 +26,34 @@ void TrackGPIOsInit(void)
 {
     EALLOW;
     /* GPIO pin configuration for tracking signals. */
+    /* CPU1 */
+    GpioCtrlRegs.GPCDIR.bit.GPIO79   = (U16)1;
+    GpioDataRegs.GPCCLEAR.bit.GPIO79 = (U16)0;
 
+    GpioCtrlRegs.GPCDIR.bit.GPIO90   = (U16)1;
+    GpioDataRegs.GPCCLEAR.bit.GPIO90 = (U16)1;
+
+    GpioCtrlRegs.GPCDIR.bit.GPIO92   = (U16)1;
+    GpioDataRegs.GPCCLEAR.bit.GPIO92 = (U16)1;
+
+    GpioCtrlRegs.GPCDIR.bit.GPIO94   = (U16)1;
+    GpioDataRegs.GPCCLEAR.bit.GPIO94 = (U16)1;
+
+    /* CPU2 */
     GpioCtrlRegs.GPCDIR.bit.GPIO70   = (U16)1; /* Output */
-    GpioDataRegs.GPCCLEAR.bit.GPIO70 = (U16)0;  
+    GpioDataRegs.GPCCLEAR.bit.GPIO70 = (U16)1;
     GpioCtrlRegs.GPCCSEL1.bit.GPIO70 = (U16)2;  
 
     GpioCtrlRegs.GPCDIR.bit.GPIO72   = (U16)1; /* Output */
-    GpioDataRegs.GPCCLEAR.bit.GPIO72 = (U16)0;     
+    GpioDataRegs.GPCCLEAR.bit.GPIO72 = (U16)1;     
     GpioCtrlRegs.GPCCSEL2.bit.GPIO72 = (U16)2;
     
     GpioCtrlRegs.GPCDIR.bit.GPIO74   = (U16)1; /* Output */
-    GpioDataRegs.GPCCLEAR.bit.GPIO74 = (U16)0;   
+    GpioDataRegs.GPCCLEAR.bit.GPIO74 = (U16)1;   
     GpioCtrlRegs.GPCCSEL2.bit.GPIO74 = (U16)2;
 
     GpioCtrlRegs.GPCDIR.bit.GPIO77   = (U16)1; /* Output */
-    GpioDataRegs.GPCCLEAR.bit.GPIO77 = (U16)0;
+    GpioDataRegs.GPCCLEAR.bit.GPIO77 = (U16)1;
     GpioCtrlRegs.GPCCSEL2.bit.GPIO77 = (U16)2;   
 
     EDIS;

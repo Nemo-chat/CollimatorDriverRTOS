@@ -43,11 +43,11 @@ void SCI_Init(void)
     SciaRegs.SCICTL1.bit.TXENA = 1;                 /* Enable TX. */
 
     /* Baud config for 57600 baud.
-     * LSPCLK = SYSCLK / 14 = 200MHz / 14 = 14.286MHz (LSPCLKDIV=7 set by mcu_vInitClocks on CPU1).
-     * BRR = LSPCLK / (BAUD * 8) - 1 = 14285714 / (57600 * 8) - 1 = 30.
+     * LSPCLK = 50MHz (LOSPCP configured on CPU1).
+     * BRR = LSPCLK / (BAUD * 8) - 1 = 50000000 / (57600 * 8) - 1 = 107.5 -> 108.
      * NOTE: CPU2 cannot read LOSPCP correctly (reads 0), so BRR is hardcoded. */
     SciaRegs.SCIHBAUD.bit.BAUD = (U16)0;
-    SciaRegs.SCILBAUD.bit.BAUD = (U16)30;
+    SciaRegs.SCILBAUD.bit.BAUD = (U16)108;
 
     SciaRegs.SCIFFTX.bit.SCIFFENA    = (U16)1;         /* Enable FIFO for communication interface. */
     SciaRegs.SCIFFTX.bit.TXFIFORESET = (U16)1;

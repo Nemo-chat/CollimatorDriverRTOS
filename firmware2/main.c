@@ -199,26 +199,24 @@ static void CommunicationTask_Func(void *pvParameters)
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
     
-    uint32_t local_active_pins = 0;
     for(;;)
     {
-        local_active_pins = ClearBitOnRegister();
         GpioDataRegs.GPCSET.bit.GPIO70 = 1;
         ECOM_MainHandler();        
+        // GpioDataRegs.GPCCLEAR.bit.GPIO70 = 1;
 
         if ((AC_GetLastReceivedCommand() < AC_CMD_GET_MOVEMENT_PARAMS_e) && !AC_GetServiceModeActive()) // If the received command is a control command and service mode is not active, notify WriteCommandToSharedMemoryTask to write the command to shared memory for CPU2 to read and execute
         {
             xTaskNotifyGive(WriteCommandToSharedMemoryTask);   
         }
-                
+        
+        // GpioDataRegs.GPCSET.bit.GPIO70 = 1;
         /* Reset command marker for next cycle */
         AC_ClearLastReceivedCommand();
 
         // Increment the execution counter
         ctrCommunicationTask++;
         GpioDataRegs.GPCCLEAR.bit.GPIO70 = 1;
-        SetBitOnRegister(local_active_pins);
-
         vTaskDelayUntil( &xLastWakeTime, pdMS_TO_TICKS( 1 ) );
     }
 }
@@ -250,15 +248,12 @@ static void WriteCommandToSharedMemoryTask_Func(void *pvParameters)
     for(;;)
     {
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY); // Wait until notified by Communication Task about new command to write to shared memory
-        local_active_pins = ClearBitOnRegister();
         GpioDataRegs.GPCSET.bit.GPIO74 = 1;
         setDataToCPU1(AC_GetLastReceivedCommand()); // Write the command and relevant data to shared memory for CPU2 to read
 
         // Increment the execution counter
         ctrWriteCommandToSharedMemoryTask++;
         GpioDataRegs.GPCCLEAR.bit.GPIO74 = 1;
-        SetBitOnRegister(local_active_pins);
-        // taskYIELD(); // Yield to allow other tasks to run immediately after writing command to shared memory
     }
 }
 
@@ -297,18 +292,20 @@ void setDataToCPU1(AC_CommandIndex_enum received_cmd)
 
     if (should_update_shared_data_b)
     {
-        while (IpcRegs.IPCSTS.bit.IPC10 != 0); // IPC handshake cannot be executed during ApplicationTask execution
-        IpcRegs.IPCSET.bit.IPC2 = 1; 
-        while(IpcRegs.IPCSTS.bit.IPC2 != 0); // Wait for CPU1 to acknowledge the update
+        IpcRegs.IPCSET.bit.IPC12 = 1; // Optional entry marker handled in CPU2 ISR
+        IpcRegs.IPCSET.bit.IPC2  = 1; 
+        while(IpcRegs.IPCFLG.bit.IPC12 != 0); // Wait until CPU2 enters ISR and ACKs marker
+        while(IpcRegs.IPCFLG.bit.IPC2  != 0); // Wait for CPU1 to acknowledge the update
         should_update_shared_data_b = False_b;
     }
 }
 
 __interrupt void ipc3_isr_cpu1(void)
 {
-    uint32_t local_active_pins = ClearBitOnRegister();
 
     GpioDataRegs.GPCSET.bit.GPIO77 = 1;
+    IpcRegs.IPCACK.bit.IPC13 = 1; // Entry marker ACK for CPU1 timing/debug
+
     MDA_SetData(&SharedDataCPU1TOCPU2.mda_data_s);         // Update MDA data in shared structure
     MTCL_SetMovementParams(SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxSpeed__rad_s__F32,
                             SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxAccel__rad_s2__F32,
@@ -324,28 +321,15 @@ __interrupt void ipc3_isr_cpu1(void)
         ATB_IncrementTime();
     }
 
-    // Clear the IPC interrupt flag
-    IpcRegs.IPCACK.bit.IPC3 = 1;                // Clear the IPC3 interrupt flag
-    PieCtrlRegs.PIEACK.bit.ACK1 = 1;			// Must acknowledge the PIE group
     ctrReadDataFromSharedMemoryISR++;
     
     GpioDataRegs.GPCCLEAR.bit.GPIO77 = 1;
-    SetBitOnRegister(local_active_pins);
+
+    // Completion ACK: CPU1 write task is allowed to continue only after this point.
+    IpcRegs.IPCACK.bit.IPC3 = 1;                // Clear the IPC3 interrupt flag
+    PieCtrlRegs.PIEACK.bit.ACK1 = 1;			// Must acknowledge the PIE group
 
     portYIELD_FROM_ISR(pdTRUE);
-}
-
-uint32_t ClearBitOnRegister()
-{
-    uint32_t local_active_pins = GpioDataRegs.GPCDAT.all; // Read the current state of the pins and store it in ActivePins variable
-
-    GpioDataRegs.GPCCLEAR.all = local_active_pins;
-    return local_active_pins;
-}
-
-void SetBitOnRegister(uint32_t pins)
-{
-    GpioDataRegs.GPCSET.all = pins;
 }
 
 /**

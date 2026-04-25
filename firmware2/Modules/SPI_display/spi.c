@@ -42,14 +42,12 @@ void spi_PinsInit(void)
     // MISO = input
     GpioCtrlRegs.GPADIR.bit.GPIO17 = 0;
 
-    GpioCtrlRegs.GPACSEL3.bit.GPIO16 = 2; // select master core CPU2
-    GpioCtrlRegs.GPACSEL3.bit.GPIO17 = 2; // select master core CPU2
-    GpioCtrlRegs.GPACSEL3.bit.GPIO18 = 2; // select master core CPU2
-    GpioCtrlRegs.GPACSEL3.bit.GPIO19 = 2; // select master core CPU2
-    GpioCtrlRegs.GPACSEL4.bit.GPIO24 = 2; // select master core CPU2
-
-    DevCfgRegs.CPUSEL6.bit.SPI_A = 1;   // 0 = CPU1 owner, 1 = CPU2 owner
-    
+    GpioCtrlRegs.GPACSEL3.bit.GPIO16 = 2; // SPISIMOA - select master core CPU2
+    GpioCtrlRegs.GPACSEL3.bit.GPIO17 = 2; // SPISOMIA - select master core CPU2
+    GpioCtrlRegs.GPACSEL3.bit.GPIO18 = 2; // SPICLKA - select master core CPU2
+    GpioCtrlRegs.GPACSEL3.bit.GPIO19 = 2; // SPISTEA - select master core CPU2
+    GpioCtrlRegs.GPACSEL4.bit.GPIO24 = 2; // RESET - select master core CPU2
+    DevCfgRegs.CPUSEL6.bit.SPI_A = 1;    // SPI_A owned by CPU2
     EDIS;
 }
 
@@ -91,7 +89,7 @@ void spi_vInit(float u16BaudRate){
     SpiaRegs.SPICCR.bit.SPILBK = 1 ;           /*loop-back mode*/
     SpiaRegs.SPICTL.bit.TALK = 1;              /*enable transmit data*/
     SpiaRegs.SPIBRR.bit.SPI_BIT_RATE =
-    (Uint16)(((float)MCU_FREQ/14.0) / (u16BaudRate)) - 1;     /*bit rate*/
+    (Uint16)((50000000.0f / u16BaudRate) - 1.0f);             /* bit rate, LSPCLK = 50MHz */
     SpiaRegs.SPIPRI.bit.FREE = 1;              /*free mode debug*/
     SpiaRegs.SPISTS.bit.INT_FLAG = 1;
     SpiaRegs.SPISTS.bit.OVERRUN_FLAG = 1;
