@@ -69,13 +69,8 @@ void dispCtrl_vSendInitInstruction(char data){
 void dispCtrl_vInitDisplay(void){
 
     DELAY_US(7000);
+
     /* set RESET pin for display*/
-
-    // GpioCtrlRegs.GPCGMUX1.bit.GPIO72 = 1;
-    // GpioCtrlRegs.GPCGMUX1.bit.GPIO72 = 0;
-    // GpioCtrlRegs.GPCDIR.bit.GPIO72 = 1;
-    // GpioDataRegs.GPCCLEAR.bit.GPIO72 = 1;
-
     GpioDataRegs.GPACLEAR.bit.GPIO24 = 1;
     GpioDataRegs.GPASET.bit.GPIO24 = 1;
 
@@ -236,7 +231,7 @@ void DisplayRefresh(void)
         dispCtrl_vSetPosition(1,3);
         float_to_char_array( ceiling_F32(( (MDA_GetData_ps()->angular_position__rad__F32 / 0.058448f) )), &buffer, 1);
         dispCtrl_u16PutString(&buffer);
-        dispCtrl_u16PutString(" mm   ");
+        dispCtrl_u16PutString(" %   ");
         dispCtrl_vSetPosition(14,3);
         dispCtrl_u16PutString(" ON");
     }
@@ -245,7 +240,7 @@ void DisplayRefresh(void)
         dispCtrl_vSetPosition(1,3);
         float_to_char_array( ceiling_F32(( (MDA_GetData_ps()->angular_position__rad__F32 / 0.058448f) )), &buffer, 1);
         dispCtrl_u16PutString(&buffer);
-        dispCtrl_u16PutString(" mm   ");
+        dispCtrl_u16PutString(" %   ");
         dispCtrl_vSetPosition(14,3);
         dispCtrl_u16PutString("OFF");
     }
@@ -258,7 +253,7 @@ void DisplayRefresh(void)
             dispCtrl_vSetPosition(1,3);
             dispCtrl_u16PutString("                ");
             dispCtrl_vSetPosition(1,4);
-            dispCtrl_u16PutString("<-1 mm    +1 mm>");
+            dispCtrl_u16PutString("<-1 %    +1 %>");
             StartApplicantionState = True_b;
     }
                 
