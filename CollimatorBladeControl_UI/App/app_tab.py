@@ -151,8 +151,10 @@ def service_mode_callback(data):
 def update_controls_state():
     global last_controls_disabled, last_svc_mode_state
     svc_active = get_service_mode_active()
-    # Disable SET controls when service mode is active OR FOC is disabled
-    should_disable = svc_active or not get_movement_enable_state()
+    # Firmware only blocks SET commands in service mode.
+    # Keep editing controls available when FOC is off so the operator can prepare values
+    # and re-enable movement without the UI appearing frozen.
+    should_disable = svc_active
     if should_disable == last_controls_disabled and svc_active == last_svc_mode_state:
         return
     last_controls_disabled = should_disable

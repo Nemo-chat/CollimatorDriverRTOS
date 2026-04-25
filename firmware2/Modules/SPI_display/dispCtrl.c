@@ -119,7 +119,7 @@ void dispCtrl_vInitDisplay(void){
     dispCtrl_vSetPosition(1,2);
     dispCtrl_u16PutString("Position: ");
     dispCtrl_vSetPosition(1,4);
-    dispCtrl_u16PutString("<-1 mm    +1 mm>");
+    dispCtrl_u16PutString("<-1 %    +1 %>");
 }
 
 /**

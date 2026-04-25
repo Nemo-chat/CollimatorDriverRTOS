@@ -21,6 +21,18 @@ parameters = {
 }
 
 
+def _run_on_ui_thread(callback, *args):
+    param_tab_el.after(0, lambda: callback(*args))
+
+
+def _apply_loaded_parameters(max_speed, max_accel, max_force):
+    parameters['max_speed'] = max_speed
+    parameters['max_accel'] = max_accel
+    parameters['max_force'] = max_force
+    for key in parameters_strings:
+        parameters_strings[key].set(str(parameters[key] / 1000))
+
+
 def save_cmd():
     err_string = ""
     for key in parameters_strings:
@@ -45,10 +57,7 @@ def load_cmd_callback(data):
     try:
         resp_dec = deconstruct_message(data)
         loc_parameters = struct.unpack('>III', resp_dec.payload[1:])
-        (parameters['max_speed'], parameters['max_accel'], parameters['max_force']) = struct.unpack('>III',
-                                                                                                    resp_dec.payload[1:])
-        for key in parameters_strings:
-            parameters_strings[key].set(str(parameters[key] / 1000))
+        _run_on_ui_thread(_apply_loaded_parameters, *loc_parameters)
     except Exception as e:
         print(f'[LOAD_PARAMS] Response error: {e}, raw data ({len(data)}B): {data.hex() if data else "empty"}')
 

@@ -21,14 +21,31 @@ parameters_strings = {
 }
 
 
+def _run_on_ui_thread(callback, *args):
+    data_disp_el.after(0, lambda: callback(*args))
+
+
+def _apply_mechanical_data(speed, position, rotor_pos):
+    parameters_strings['speed'].set(str(speed))
+    parameters_strings['pos'].set(str(position))
+    parameters_strings['rotor_pos'].set(str(rotor_pos))
+    set_remote_position(position)
+
+
+def _apply_electrical_data(curr_d, curr_q, link_voltage):
+    parameters_strings['id'].set(str(curr_d))
+    parameters_strings['iq'].set(str(curr_q))
+    parameters_strings['link_voltage'].set(str(link_voltage))
+
+
 def write_new_mech_data(data):
     try:
         resp_dec = deconstruct_message(data)
         loc_parameters = struct.unpack('>III', resp_dec.payload[1:])
-        parameters_strings['speed'].set(str(loc_parameters[0] / 1000))
-        parameters_strings['pos'].set(str(loc_parameters[1] / 1000))
-        parameters_strings['rotor_pos'].set(str(loc_parameters[2] / 1000))
-        set_remote_position(loc_parameters[1] / 1000)
+        _run_on_ui_thread(_apply_mechanical_data,
+                          loc_parameters[0] / 1000,
+                          loc_parameters[1] / 1000,
+                          loc_parameters[2] / 1000)
     except Exception as e:
         print(f'[MECH_DATA] Response error: {e}, raw data ({len(data)}B): {data.hex() if data else "empty"}')
 
@@ -37,9 +54,10 @@ def write_new_electrical_data(data):
     try:
         resp_dec = deconstruct_message(data)
         loc_parameters = struct.unpack('>III', resp_dec.payload[1:])
-        parameters_strings['id'].set(str(loc_parameters[0] / 1000))
-        parameters_strings['iq'].set(str(loc_parameters[1] / 1000))
-        parameters_strings['link_voltage'].set(str(loc_parameters[2] / 1000))
+        _run_on_ui_thread(_apply_electrical_data,
+                          loc_parameters[0] / 1000,
+                          loc_parameters[1] / 1000,
+                          loc_parameters[2] / 1000)
     except Exception as e:
         print(f'[ELEC_DATA] Response error: {e}, raw data ({len(data)}B): {data.hex() if data else "empty"}')
 
@@ -81,7 +99,7 @@ def data_display(root):
     #                       variable=parameters_strings['pos'])
     # position.elmnt.grid(row=1, column=0, sticky='NSEW')
 
-    rotor_position = ParamField(mech_data_frame, 'Rotor position [deg]', entry_state='readonly',
+    rotor_position = ParamField(mech_data_frame, 'Rotor position [rad]', entry_state='readonly',
                                 variable=parameters_strings['rotor_pos'])
     rotor_position.elmnt.grid(row=2, column=0, sticky='NSEW')
 
