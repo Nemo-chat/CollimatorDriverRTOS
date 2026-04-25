@@ -1,8 +1,12 @@
 /*
  * InterruptServiceRoutines.h
  *
- *  Created on: Mar 28, 2024
- *      Author: roland
+ *  Created on: Apr 23, 2026
+ *      Author: Bc. Vadym Holysh
+ *
+ * ==================================================================
+ * Code edited by Bc. Vadym Holysh, date: April 23, 2026.
+ * 
  */
 
 #ifndef INTERRUPTSERVICEROUTINES_H_

@@ -1,4 +1,5 @@
 /**
+ * Code edited by Bc. Vadym Holysh, date: April 23, 2026.
  * @file FOC.h
  * @brief Field oriented control
  *

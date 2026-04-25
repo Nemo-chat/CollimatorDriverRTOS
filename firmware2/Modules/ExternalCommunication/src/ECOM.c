@@ -1,4 +1,5 @@
 /**
+ * Code edited by Bc. Vadym Holysh, date: April 23, 2026.
  * @file ECOM.c
  * @brief External communication submodule.
  * @details Manages motor position requests and motor control states.

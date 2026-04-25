@@ -36,7 +36,7 @@
 //--------------------------------------------------------------------------------------------------
 
 #define configUSE_PREEMPTION                  0
-#define configUSE_IDLE_HOOK                   0 // errory ak 1 ?
+#define configUSE_IDLE_HOOK                   0 
 #define configUSE_TIME_SLICING                0 // distributes processing time between tasks with the same priorities, even if they are not inferior in queue
 #define configUSE_TICK_HOOK                   0
 #define configCPU_CLOCK_HZ                    ( ( unsigned long ) 200000000 )
@@ -51,8 +51,8 @@
 #define configUSE_CO_ROUTINES                 0
 #define configUSE_MUTEXES                     1
 #define configUSE_RECURSIVE_MUTEXES           1
-#define configCHECK_FOR_STACK_OVERFLOW        0 // changed from 2
-#define configSUPPORT_STATIC_ALLOCATION       0 // changed from 1
+#define configCHECK_FOR_STACK_OVERFLOW        0 
+#define configSUPPORT_STATIC_ALLOCATION       0 
 #define configSUPPORT_DYNAMIC_ALLOCATION      1
 #define configTASK_NOTIFICATION_ARRAY_ENTRIES 1
 /* This option needs to be enabled to keep the heap memory in valid memory section

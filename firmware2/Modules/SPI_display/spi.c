@@ -1,4 +1,5 @@
 /**
+ * Code edited by Bc. Vadym Holysh, date: April 23, 2026.
  * @file spi.c
  * @brief Serial Peripheral Interface, communication standard for LCD display
  * @details Initialization function, function for sending data

@@ -1,4 +1,5 @@
 /**
+ * Code edited by Bc. Vadym Holysh, date: April 23, 2026.
  * @file ATB.c
  *
  * @section ATB ATB Application time base module

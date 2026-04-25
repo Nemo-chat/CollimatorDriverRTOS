@@ -1,4 +1,5 @@
 /**
+ * Code edited by Bc. Vadym Holysh, date: April 23, 2026.
  * @file AC_core.h
  * @brief Application control module
  * @details Module for controlling application using user interface or external serial communication.

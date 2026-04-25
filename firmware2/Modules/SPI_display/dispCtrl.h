@@ -1,7 +1,8 @@
 /*
+ * Code edited by Bc. Vadym Holysh, date: April 23, 2026.
  * dispCtrl.h
  *
- *  Created on: 10 mar. 2024 ã.
+ *  Created on: 10 mar. 2024 ï¿½.
  *      Author: vadym
  */
 

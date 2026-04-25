@@ -1,14 +1,18 @@
-/*
- * InterruptServiceRoutines.c
+/**
+ * @file InterruptServiceRoutines.c
+ * @brief IPC interrupt initialization and tracking GPIO setup for CPU2.
  *
- *  Created on: Mar 28, 2024
- *      Author: roland
+ * @date April 23, 2026
+ * @author Bc. Vadym Holysh
+ * @note Code edited by Bc. Vadym Holysh, date: April 23, 2026.
  */
 #include <main.h>
-#include <ATB_interface.h>
-#include <MTCL_interface.h>
 #include "InterruptServiceRoutines.h"
 
+/**
+ * @brief Initializes the IPC interrupt for CPU2 and registers the provided ISR.
+ * @param ipc3_isr_cpu1 Pointer to the ISR function to be registered for IPC3 interrupt on CPU2.
+ */
 void IPC_ISRvInit_CPU2(interrupt void (*ipc3_isr_cpu1)(void))
 {
     DINT;									// Disable global interrupts

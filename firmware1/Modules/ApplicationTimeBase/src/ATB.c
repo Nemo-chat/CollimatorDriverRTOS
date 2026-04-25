@@ -1,4 +1,5 @@
 /**
+ * Code edited by Bc. Vadym Holysh, date: April 23, 2026.
  * @file ATB.c
  *
  * @section ATB ATB Application time base module
@@ -26,23 +27,6 @@ static U16 s_ATB_Initialized_U16 = 0;                               /**< Module 
  */
 void ATB_Init(void)
 {
-    // if(s_ATB_Initialized_U16 == (U16)0)                             /* Initialize only once. */
-    // {
-    //     CpuTimer0Regs.TCR.bit.FREE = (U16)1;                        /* While debugging - do not stop the timer. */
-    //     CpuTimer0Regs.TPRH.all = (U16)0;
-    //     CpuTimer0Regs.TPR.bit.TDDR = (U16)19;                       /* Divide timer clock by 20. */
-    //     CpuTimer0Regs.PRD.all = (U32)99;                            /* Timer overflow every 10us. */
-    //     CpuTimer0Regs.TCR.bit.TIE = (U16)1;                         /* Enable timer overflow interrupt. */                                                  /* Enable interrupts. */
-    //     s_ATB_Initialized_U16 = (U16)1;
-    // }
-
-    // CpuTimer1Regs.TCR.bit.FREE = (U16)1;                        /* While debugging - do not stop the timer. */
-    // CpuTimer1Regs.TPRH.all = (U16)0;
-    // CpuTimer1Regs.TPR.bit.TDDR = (U16)19;                       /* Divide timer clock by 20. */
-    // CpuTimer1Regs.PRD.all = (U32)990000;                            /* Timer overflow every 10us. */
-    // CpuTimer1Regs.TCR.bit.TIE = (U16)1;                         /* Enable timer overflow interrupt. */
-    // CpuTimer1Regs.TCR.bit.TSS = 0;
-
     EALLOW;
 
     CpuTimer1Regs.TCR.bit.TSS = 1;

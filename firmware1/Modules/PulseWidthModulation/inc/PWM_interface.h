@@ -1,4 +1,5 @@
 /**
+ * Code edited by Bc. Vadym Holysh, date: April 23, 2026.
  * @file pwm_interface.h
  * @brief Pulse width modulation core
  * @details Details

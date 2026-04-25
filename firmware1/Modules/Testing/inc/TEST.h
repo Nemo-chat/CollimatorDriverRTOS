@@ -1,4 +1,5 @@
 /*
+ * Code edited by Bc. Vadym Holysh, date: April 23, 2026.
  * TEST.h
  *
  *  Created on: Mar 20, 2024

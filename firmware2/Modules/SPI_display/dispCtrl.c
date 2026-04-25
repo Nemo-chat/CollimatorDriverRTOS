@@ -1,4 +1,5 @@
 /**
+ * Code edited by Bc. Vadym Holysh, date: April 23, 2026.
  * @file dispCtrl.c
  * @brief LCD display control using SPI communication
  * @details Instruction for display DOGS164-A

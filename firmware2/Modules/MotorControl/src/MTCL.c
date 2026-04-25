@@ -1,4 +1,5 @@
 /**
+ * Code edited by Bc. Vadym Holysh, date: April 23, 2026.
  * @file MTCL.c
  *
  * @section MTCL MTCL Motor control module

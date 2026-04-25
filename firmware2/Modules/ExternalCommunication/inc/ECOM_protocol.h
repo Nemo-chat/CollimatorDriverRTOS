@@ -1,4 +1,5 @@
 /**
+ * Code edited by Bc. Vadym Holysh, date: April 23, 2026.
  * @file ECOM_protocol.h
  * @brief External communication buffer submodule.
  * @details Manages communication buffers.

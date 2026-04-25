@@ -1,4 +1,5 @@
 /**
+ * Code edited by Bc. Vadym Holysh, date: April 23, 2026.
  * @file MDA_config.h
  * @brief Motor data acquisition module
  * @details Module for readeading and evaluating measurement data for further regulation and control.

@@ -1,18 +1,24 @@
 /**
  * @file main.c
- * @brief Main application file
- * @details Details
- *
+ * @brief Main application file for CPU2
+ * @details This file contains the main function which initializes the system, 
+ *          creates tasks for processing inputs, controlling the application, writing to shared memory, 
+ *          and processing outputs. It also includes the necessary setup for 
+ *          inter-processor communication (IPC) between CPU1 and CPU2.
+ * 
  * =================================================================
  * @author Bc. Samuel Fertal
  * @author Bc. Vadym Holysh
  * @author Bc. Roland Molnar
- *
+ * 
  * =================================================================
  * KEM, FEI, TUKE
  * @date 27.02.2024
- *
- * Start work at RTOS integration 7.9.2025
+ * 
+ * File reworked by 
+ * @author Bc. Vadym Holysh, 
+ * @date April 23, 2026.
+ * 
  */
 #include <main.h>
 #include <ATB_interface.h>
@@ -25,31 +31,27 @@
 #include <PI_Controller.h>
 #include "spi.h"
 #include "dispCtrl.h"
+
+/* FreeRTOS includes */
 #include "FreeRTOS.h"
 #include "task.h"
 #include "semphr.h"
 #include "FreeRTOSConfig.h"
 
-// Macro to define stack size of individual tasks
-#define COM_TASK_STACK_SIZE 1024
-#define PRINT_TASK_STACK_SIZE 256
+/* Task stack sizes */
+#define COM_TASK_STACK_SIZE                            512
+#define PRINT_TASK_STACK_SIZE                          256
 #define WRITE_COMMAND_TO_SHARED_MEMORY_TASK_STACK_SIZE 256
 
-
-// Macro to define priorities of individual tasks
+/* Task priorities */
 #define PRINT_TASK_PRIORITY                            1
 #define COMMUNICATION_TASK_PRIORITY                    2
 #define WRITE_COMMAND_TO_SHARED_MEMORY_TASK_PRIORITY   3
 
-#define STACK_SIZE  256U
+/* Stack size for idle task */
+#define STACK_SIZE                                     256                       
 
-// #define PINS_MASK  ((1UL << 6) | (1UL << 8) | (1UL << 10) | (1UL << 13)) /* GPIO70, GPIO72, GPIO74, GPIO77 */
-
-// uint32_t ActivePins = 0; 
-
-uint32_t ClearBitOnRegister();
-void SetBitOnRegister(uint32_t pins);
-
+/* Shared data structure for communication from CPU1 to CPU2 */
 typedef struct
 {
     MDA_Data_struct mda_data_s;
@@ -61,6 +63,7 @@ typedef struct
 
 }SharedDataCPU1TOCPU2_struct;
 
+/* Shared data structure for communication from CPU2 to CPU1 */
 typedef struct 
 {
     MTCL_MovementParams_struct mtcl_movement_params_s;
@@ -71,51 +74,41 @@ typedef struct
 
 }SharedDataCPU2TOCPU1_struct;
 
-// Task handles
+/* Task handles */
 TaskHandle_t CommunicationTask, PrintTask, WriteCommandToSharedMemoryTask;
 
-// Execution counters
-static volatile uint32_t ctrCommunicationTask = 0;
-static volatile uint32_t ctrPrintTask = 0;
-static volatile uint32_t ctrInterruptEventIPC_from_CPU1 = 0;
-static volatile uint32_t ctrWriteCommandToSharedMemoryTask = 0;
-static volatile uint32_t ctrReadDataFromSharedMemoryISR = 0;
-
+/* Flag that indicates whether shared data should be updated */
 boolean should_update_shared_data_b = False_b;
 
-float elapsedTime = 0;
-uint32_t startTime = 0;
-uint32_t endTime = 0;
-
-// Shared data structure for communication between CPU1 and CPU2
+/* Assigned shared data structures to specific memory sections */
 volatile SharedDataCPU1TOCPU2_struct SharedDataCPU1TOCPU2;
 #pragma DATA_SECTION(SharedDataCPU1TOCPU2, "MSGRAM_CPU1_TO_CPU2")
 
-// Shared data structure for communication between CPU1 and CPU2
 volatile SharedDataCPU2TOCPU1_struct SharedDataCPU2TOCPU1;
 #pragma DATA_SECTION(SharedDataCPU2TOCPU1, "MSGRAM_CPU2_TO_CPU1")
 
+/* Idle task memory */
 static StaticTask_t idleTaskBuffer;
 static StackType_t  idleTaskStack[STACK_SIZE];
 #pragma DATA_SECTION(idleTaskStack,   ".freertosStaticStack")
 #pragma DATA_ALIGN ( idleTaskStack , portBYTE_ALIGNMENT )
 
+/* Heap memory for FreeRTOS */
 #if(configAPPLICATION_ALLOCATED_HEAP == 1)
 uint8_t ucHeap[ configTOTAL_HEAP_SIZE ];
 #pragma DATA_SECTION(ucHeap,   ".freertosHeap")
 #pragma DATA_ALIGN ( ucHeap , portBYTE_ALIGNMENT )
 #endif
 
-// Function prototypes
+/* Function prototypes for tasks */
 static void CommunicationTask_Func(void *pvParameters);
 static void PrintTask_Func(void *pvParameters);
 static void WriteCommandToSharedMemoryTask_Func(void *pvParameters);
 
-void lockCPU2(void);
-void unlockCPU2(void);
+
 void setDataToCPU1(AC_CommandIndex_enum);
 
-// vApplicationGetIdleTaskMemory
+/* Function to provide memory for the idle task. */
 void vApplicationGetIdleTaskMemory( StaticTask_t **ppxIdleTaskTCBBuffer,
                                     StackType_t **ppxIdleTaskStackBuffer,
                                     uint32_t *pulIdleTaskStackSize )
@@ -125,26 +118,27 @@ void vApplicationGetIdleTaskMemory( StaticTask_t **ppxIdleTaskTCBBuffer,
     *pulIdleTaskStackSize = STACK_SIZE;
 }
 
-// vApplicationStackOverflowHook
+/* Function to handle stack overflow */
 void vApplicationStackOverflowHook( TaskHandle_t xTask, char *pcTaskName )
 {
     while(1);
 }
 
+/* Function prototypes for ISRs */
 __interrupt void ipc3_isr_cpu1(void);
 
 void main(void)
 {
     /* Initialization */
-    Interrupt_initModule();       // Need reveiw if it neccessary
-    Interrupt_initVectorTable();  // Need reveiw if it neccessary
-    IPC_ISRvInit_CPU2(&ipc3_isr_cpu1);          // Initialize IPC ISRs for CPU2
-    spi_vInit(800000);
-    dispCtrl_vInitDisplay();
-    ATB_Init();
-    SCI_Init();
+    Interrupt_initModule();              /* Initialize the interrupt module */
+    Interrupt_initVectorTable();         /* Initialize the interrupt vector table */
+    IPC_ISRvInit_CPU2(&ipc3_isr_cpu1);   /* Initialize IPC ISRs for CPU2 */
+    spi_vInit(800000);                   /* Initialize SPI module with baud rate of 800 kbps */
+    dispCtrl_vInitDisplay();             /* Initialize the display controller */
+    ATB_Init();                          /* Initialize the ATB module */
+    SCI_Init();                          /* Initialize the SCI module */
 
-    // Create tasks and check if they were created successfully
+    /* Create tasks and check if they were created successfully */
     if(xTaskCreate(CommunicationTask_Func, 
                    (const char *)"CommunicationTask", 
                    COM_TASK_STACK_SIZE, 
@@ -175,11 +169,11 @@ void main(void)
         ESTOP0;
     }
 
-    // IPC synchronization with CPU1 
+    /* IPC synchronization with CPU1 */
     IpcRegs.IPCSET.bit.IPC17 = 1;
     while(IpcRegs.IPCFLG.bit.IPC17 != 0);
 
-    // Start the scheduler.  This should not return.
+    /* Start the scheduler.  This should not return. */
     vTaskStartScheduler();
 
     /* Main loop */
@@ -189,72 +183,87 @@ void main(void)
     }
 }
 
+// ===================================== TASKS FUNCTIONS ================================================
+
 /**
- * @brief Function for the Process Inputs task.
+ * @brief Function for Communication task.
+ * @details This task handles the communication with PC via SCI module, 
+ *          processes received commands, send updated data from CPU1,, 
+ *          and manages the timing of these operations. 
+ *          If SET command is received, it notifies the WriteCommandToSharedMemoryTask 
+ *          to write the command and relevant data to shared memory for CPU2 to read and execute.
+ *          It runs periodically every 1 ms to ensure timely processing of commands and data exchange with CPU1.         
  */
 static void CommunicationTask_Func(void *pvParameters)
 {
+    /* Timing variables for periodic execution */
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
     
     for(;;)
     {
         GpioDataRegs.GPCSET.bit.GPIO70 = 1;
-        ECOM_MainHandler();        
-        // GpioDataRegs.GPCCLEAR.bit.GPIO70 = 1;
 
-        if ((AC_GetLastReceivedCommand() < AC_CMD_GET_MOVEMENT_PARAMS_e) && !AC_GetServiceModeActive()) // If the received command is a control command and service mode is not active, notify WriteCommandToSharedMemoryTask to write the command to shared memory for CPU2 to read and execute
+        ECOM_MainHandler();         /* Handle serial communication with PC by packets*/
+
+        /* Check if a new command was received and if it's a SET command while not in service mode, 
+        then notify the task to write it to shared memory for CPU2 to read and execute */
+        if ((AC_GetLastReceivedCommand() < AC_CMD_GET_MOVEMENT_PARAMS_e) && !AC_GetServiceModeActive()) 
         {
             xTaskNotifyGive(WriteCommandToSharedMemoryTask);   
         }
         
-        // GpioDataRegs.GPCSET.bit.GPIO70 = 1;
         /* Reset command marker for next cycle */
         AC_ClearLastReceivedCommand();
 
-        // Increment the execution counter
-        ctrCommunicationTask++;
         GpioDataRegs.GPCCLEAR.bit.GPIO70 = 1;
-        vTaskDelayUntil( &xLastWakeTime, pdMS_TO_TICKS( 1 ) );
+        vTaskDelayUntil( &xLastWakeTime, pdMS_TO_TICKS( 1 ) );   /* Run this task every 1 ms */
     }
 }
 
 /**
  * @brief Function for the Application task.
+ * @details This task handles the display refresh and runs periodically every 100 ms.
  */
 static void PrintTask_Func(void *pvParameters)
 {
+    /* Timing variables for periodic execution */
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
 
     for(;;)
     {
         GpioDataRegs.GPCSET.bit.GPIO72 = 1;
-        DisplayRefresh();
-        
-        // Increment the execution counter
-        ctrPrintTask++;
+        DisplayRefresh();                                       /* Refresh the display with the latest data */
 
         GpioDataRegs.GPCCLEAR.bit.GPIO72 = 1;
-        vTaskDelayUntil( &xLastWakeTime, pdMS_TO_TICKS( 100 ) );
+        vTaskDelayUntil( &xLastWakeTime, pdMS_TO_TICKS( 100 ) ); /* Run this task every 100 ms */
     }
 }
 
+/**
+ * @brief Function for the Write Command to Shared Memory task.
+ * @details This task waits for a notification from the Communication Task about a new command to write to shared memory, 
+ *          then writes the command and relevant data to shared memory for CPU1 to read and execute. 
+ *          It also manages the IPC handshake with CPU1 to ensure proper synchronization of data exchange.
+ */
 static void WriteCommandToSharedMemoryTask_Func(void *pvParameters)
 {
-    uint32_t local_active_pins = 0;
     for(;;)
     {
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY); // Wait until notified by Communication Task about new command to write to shared memory
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);    /* Wait for a notification from the Communication Task about a new command to write to shared memory */
         GpioDataRegs.GPCSET.bit.GPIO74 = 1;
-        setDataToCPU1(AC_GetLastReceivedCommand()); // Write the command and relevant data to shared memory for CPU2 to read
-
-        // Increment the execution counter
-        ctrWriteCommandToSharedMemoryTask++;
+        setDataToCPU1(AC_GetLastReceivedCommand()); /* Write the command and relevant data to shared memory for CPU1 to read and execute */
         GpioDataRegs.GPCCLEAR.bit.GPIO74 = 1;
     }
 }
 
+/* ===================================== OTHER FUNCTIONS ================================================ */
+
+/**
+ * @brief Function to set data received from CPU2 to the relevant modules based on the command received.
+ * @details This function is called in the IPC ISR when CPU2 sends a command.
+ */
 void setDataToCPU1(AC_CommandIndex_enum received_cmd)
 {
     switch(received_cmd)
@@ -287,47 +296,53 @@ void setDataToCPU1(AC_CommandIndex_enum received_cmd)
         should_update_shared_data_b = False_b;
         break;
     }
-
+    /* Perform IPC handshake with CPU1 to ensure proper synchronization of data exchange */
     if (should_update_shared_data_b)
     {
-        IpcRegs.IPCSET.bit.IPC12 = 1; // Optional entry marker handled in CPU2 ISR
-        IpcRegs.IPCSET.bit.IPC2  = 1; 
-        while(IpcRegs.IPCFLG.bit.IPC12 != 0); // Wait until CPU2 enters ISR and ACKs marker
-        while(IpcRegs.IPCFLG.bit.IPC2  != 0); // Wait for CPU1 to acknowledge the update
+        IpcRegs.IPCSET.bit.IPC12 = 1;         /* Flag must be acknowledged by ISR on CPU1 */
+        IpcRegs.IPCSET.bit.IPC2  = 1;         /* Generate interrupt on CPU1 */
+        while(IpcRegs.IPCFLG.bit.IPC12 != 0); /* Wait until CPU1 enters ISR and ACKs marker */
+        while(IpcRegs.IPCFLG.bit.IPC2  != 0); /* Wait for CPU2 to acknowledge the update */
         should_update_shared_data_b = False_b;
     }
 }
 
+/* ===================================== IPC ISR ================================================ */
+
+/**
+ * @brief IPC ISR that handles updated data from CPU1 via shared memory.
+ * @details This ISR is triggered when CPU1 sends an interrupt to CPU2 indicating that new data is available in shared memory.
+ *          It reads the updated data from shared memory and updates the relevant modules accordingly.
+ */
 __interrupt void ipc3_isr_cpu1(void)
 {
 
     GpioDataRegs.GPCSET.bit.GPIO77 = 1;
-    IpcRegs.IPCACK.bit.IPC13 = 1; // Entry marker ACK for CPU1 timing/debug
+    IpcRegs.IPCACK.bit.IPC13 = 1;                  /* Acknowledge IPC13 that interrupt has been received */
 
-    MDA_SetData(&SharedDataCPU1TOCPU2.mda_data_s);         // Update MDA data in shared structure
+    /* Read the updated data from shared memory and update the relevant modules accordingly */
+    MDA_SetData(&SharedDataCPU1TOCPU2.mda_data_s);         
     MTCL_SetMovementParams(SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxSpeed__rad_s__F32,
                             SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxAccel__rad_s2__F32,
-                            SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxTorque__Nm__F32); // Update MTCL movement parameters in shared structure
-    MTCL_SetMaximumPosition_F32(&SharedDataCPU1TOCPU2.mtcl_maximum_position_rad_F32); // Update MTCL maximum position in shared structure
-    FOC_SetEnableState(SharedDataCPU1TOCPU2.foc_enable_state_b); // Update FOC enable state in shared structure
-    s_MTCL_Control_s.over_torque_error_f1 = SharedDataCPU1TOCPU2.mtcl_control_s.over_torque_error_f1; // Update MTCL control struct in shared structure
-    AC_SetServiceModeActive(SharedDataCPU1TOCPU2.active_service_mode_b); // Update service mode state in shared structure
+                            SharedDataCPU1TOCPU2.mtcl_movement_params_s.MaxTorque__Nm__F32);
+    MTCL_SetMaximumPosition_F32(&SharedDataCPU1TOCPU2.mtcl_maximum_position_rad_F32); 
+    FOC_SetEnableState(SharedDataCPU1TOCPU2.foc_enable_state_b); 
+    s_MTCL_Control_s.over_torque_error_f1 = SharedDataCPU1TOCPU2.mtcl_control_s.over_torque_error_f1; 
+    AC_SetServiceModeActive(SharedDataCPU1TOCPU2.active_service_mode_b); 
 
+    /* Update system timer on CPU2, necessary for synchronization. ISR occures every 10 application iteration. Not elegant, but it is what it is. */
     uint8_t i;
     for (i = 0; i < 10; i++) 
     {
         ATB_IncrementTime();
     }
-
-    ctrReadDataFromSharedMemoryISR++;
     
     GpioDataRegs.GPCCLEAR.bit.GPIO77 = 1;
 
-    // Completion ACK: CPU1 write task is allowed to continue only after this point.
-    IpcRegs.IPCACK.bit.IPC3 = 1;                // Clear the IPC3 interrupt flag
-    PieCtrlRegs.PIEACK.bit.ACK1 = 1;			// Must acknowledge the PIE group
+    IpcRegs.IPCACK.bit.IPC3 = 1;                /* Clear the IPC3 interrupt flag */
+    PieCtrlRegs.PIEACK.bit.ACK1 = 1;			/* Must acknowledge the PIE group */
 
-    portYIELD_FROM_ISR(pdTRUE);
+    portYIELD_FROM_ISR(pdTRUE);                 /* Yield to allow higher priority tasks to run immediately if needed */
 }
 
 /**

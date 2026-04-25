@@ -10,17 +10,18 @@
  * KEM, FEI, TUKE
  * @date 29.02.2024
  * @addtogroup AC Application control core
+ * Code edited by Bc. Vadym Holysh, date: April 23, 2026.
  * @{
- */
-#include <app_types.h>
+*/
 
+#include <app_types.h>
 #ifndef AC_CORE_H_
 #define AC_CORE_H_
 
 #define AC_CORE_CHECK_INDEX_BOUND_dM_b(idx)   ( idx < (sizeof(AC_Functions) / sizeof(AC_ControlFunction_pF)) )
 
 #define AC_BTN1_PRESSED_db          ( (boolean)!GpioDataRegs.GPBDAT.bit.GPIO40 )    /**< Check if button 1 is pressed. */
-#define AC_BTN2_PRESSED_db          ( (boolean)!GpioDataRegs.GPBDAT.bit.GPIO41 )    /**< Check if button 1 is pressed. */
+#define AC_BTN2_PRESSED_db          ( (boolean)!GpioDataRegs.GPBDAT.bit.GPIO41 )    /**< Check if button 2 is pressed. */
 #define AC_BTN3_PRESSED_db          ( (boolean)!GpioDataRegs.GPBDAT.bit.GPIO42 )    /**< Check if button 3 is pressed. */
 #define AC_BTN4_PRESSED_db          ( (boolean)!GpioDataRegs.GPBDAT.bit.GPIO43 )    /**< Check if button 4 is pressed. */
 

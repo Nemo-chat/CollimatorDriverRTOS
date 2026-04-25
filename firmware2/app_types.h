@@ -1,4 +1,5 @@
 /**
+ * Code edited by Bc. Vadym Holysh, date: April 23, 2026.
  * @file app_types.h
  * @brief Application common variable typedefs and variable limits
  *
