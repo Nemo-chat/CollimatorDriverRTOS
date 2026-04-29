@@ -20,6 +20,8 @@
  * @date April 23, 2026.
  * 
  */
+#include <device.h>
+
 #include <main.h>
 #include <ATB_interface.h>
 #include <AC_interface.h>
@@ -31,6 +33,7 @@
 #include "TEST.h"
 #include <PI_Controller.h>
 #include "spi.h"
+#include <string.h>
 
 /* FreeRTOS includes */
 #include "FreeRTOS.h"
@@ -108,6 +111,7 @@ static void ProcessInputsTask_Func(void *pvParameters);
 static void ApplicationTask_Func(void *pvParameters);
 static void WriteToSharedMemoryTask_Func(void *pvParameters);
 static void ProcessOutputTask_Func(void *pvParameters);
+static void CPU2_ForceResetRelease(void);
 
 void getDataFromCPU2(void);
 
@@ -131,16 +135,49 @@ void vApplicationStackOverflowHook( TaskHandle_t xTask, char *pcTaskName )
 __interrupt void MDA_AdcConversionCompleteIsr(void);
 __interrupt void ipc2_isr_cpu2(void);
 
+static void CPU2_ForceResetRelease(void)
+{
+    EALLOW;
+    /* Assert CPU2 reset with key write. */
+    DevCfgRegs.CPU2RESCTL.all = (SYSCTL_REG_KEY | 0x00000001U);
+    EDIS;
+
+    DEVICE_DELAY_US(10U);
+
+    EALLOW;
+    /* Release CPU2 reset with key write. */
+    DevCfgRegs.CPU2RESCTL.all = SYSCTL_REG_KEY;
+    EDIS;
+}
+
 void main(void)
 {
     /* Create a semaphore. Must be done before ISR starts */
     SyncSemaphore = xSemaphoreCreateBinary();
+
+#ifdef _FLASH
+    /* .TI.ramfunc code must be copied before calling flash init function. */
+    memcpy(&RamfuncsRunStart, &RamfuncsLoadStart, (size_t)&RamfuncsLoadSize);
+    Flash_initModule(FLASH0CTRL_BASE, FLASH0ECC_BASE, DEVICE_FLASH_WAITSTATES);
+#endif
  
     /* Initialization */
     mcu_vInitClocks();                              /* Initialize uC clock system. */
     EALLOW;
     ClkCfgRegs.LOSPCP.bit.LSPCLKDIV = 2;            /* Set LSPCLK for both CPUs on 50 MHz. */
     EDIS;
+
+#if defined(_FLASH) && defined(_STANDALONE)
+    /* Boot CPU2 only in standalone mode. In CCS dual-core debug, CPU2 is loaded separately. */
+    CPU2_ForceResetRelease();
+    IpcRegs.IPCCLR.all = 0xFFFFFFFFU;
+
+    // if(Device_bootCPU2(C1C2_BROM_BOOTMODE_BOOT_FROM_FLASH) != STATUS_PASS)
+    // {
+    //     ESTOP0;
+    // }
+#endif
+
     Interrupt_initModule();                         /* Initialize the Interrupt module. */
     Interrupt_initVectorTable();                    /* Initialize the Interrupt vector table. */
     IPC_ISRvInit_CPU1(&ipc2_isr_cpu2);              /* Initialize IPC ISRs for CPU2 */
@@ -212,7 +249,6 @@ void main(void)
     {
         ESTOP0;
     }
-
     /* IPC synchronization with CPU2 */
     while(IpcRegs.IPCSTS.bit.IPC17 == 0);
     IpcRegs.IPCACK.bit.IPC17 = 1;

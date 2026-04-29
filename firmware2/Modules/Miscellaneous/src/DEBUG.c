@@ -8,13 +8,13 @@
 
 void DEBUG_Init(void)
 {
-    EALLOW;
-    GpioCtrlRegs.GPADIR.bit.GPIO31 = 1;
-    GpioCtrlRegs.GPBDIR.bit.GPIO34 = 1;
-    EDIS;
-
-    GpioDataRegs.GPASET.bit.GPIO31 = 1;
-    GpioDataRegs.GPBSET.bit.GPIO34 = 1;
+//    EALLOW;
+//    GpioCtrlRegs.GPADIR.bit.GPIO31 = 1;
+//    GpioCtrlRegs.GPBDIR.bit.GPIO34 = 1;
+//    EDIS;
+//
+//    GpioDataRegs.GPASET.bit.GPIO31 = 1;
+//    GpioDataRegs.GPBSET.bit.GPIO34 = 1;
 }
 
 

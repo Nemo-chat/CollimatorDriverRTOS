@@ -20,6 +20,7 @@
  * @date April 23, 2026.
  * 
  */
+#include <device.h>
 #include <main.h>
 #include <ATB_interface.h>
 #include <AC_interface.h>
@@ -31,6 +32,7 @@
 #include <PI_Controller.h>
 #include "spi.h"
 #include "dispCtrl.h"
+#include <string.h>
 
 /* FreeRTOS includes */
 #include "FreeRTOS.h"
@@ -129,6 +131,12 @@ __interrupt void ipc3_isr_cpu1(void);
 
 void main(void)
 {
+#ifdef _FLASH
+    /* .TI.ramfunc code must be copied before calling flash init function. */
+    memcpy(&RamfuncsRunStart, &RamfuncsLoadStart, (size_t)&RamfuncsLoadSize);
+    Flash_initModule(FLASH0CTRL_BASE, FLASH0ECC_BASE, DEVICE_FLASH_WAITSTATES);
+#endif
+
     /* Initialization */
     Interrupt_initModule();              /* Initialize the interrupt module */
     Interrupt_initVectorTable();         /* Initialize the interrupt vector table */
@@ -233,10 +241,10 @@ static void PrintTask_Func(void *pvParameters)
 
     for(;;)
     {
-        GpioDataRegs.GPCSET.bit.GPIO72 = 1;
+        // GpioDataRegs.GPCSET.bit.GPIO72 = 1;
         DisplayRefresh();                                       /* Refresh the display with the latest data */
 
-        GpioDataRegs.GPCCLEAR.bit.GPIO72 = 1;
+        // GpioDataRegs.GPCCLEAR.bit.GPIO72 = 1;
         vTaskDelayUntil( &xLastWakeTime, pdMS_TO_TICKS( 100 ) ); /* Run this task every 100 ms */
     }
 }

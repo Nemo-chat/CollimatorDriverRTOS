@@ -53,9 +53,9 @@ void TrackGPIOsInit(void)
     GpioDataRegs.GPCCLEAR.bit.GPIO70 = (U16)1;
     GpioCtrlRegs.GPCCSEL1.bit.GPIO70 = (U16)2;  
 
-    GpioCtrlRegs.GPCDIR.bit.GPIO72   = (U16)1; 
-    GpioDataRegs.GPCCLEAR.bit.GPIO72 = (U16)1;     
-    GpioCtrlRegs.GPCCSEL2.bit.GPIO72 = (U16)2;
+    // GpioCtrlRegs.GPCDIR.bit.GPIO72   = (U16)1; 
+    // GpioDataRegs.GPCCLEAR.bit.GPIO72 = (U16)1;     
+    // GpioCtrlRegs.GPCCSEL2.bit.GPIO72 = (U16)2;
     
     GpioCtrlRegs.GPCDIR.bit.GPIO74   = (U16)1; 
     GpioDataRegs.GPCCLEAR.bit.GPIO74 = (U16)1;   
